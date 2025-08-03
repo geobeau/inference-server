@@ -1599,6 +1599,7 @@ dependencies = [
  "futures",
  "http 1.3.1",
  "ndarray",
+ "num-traits",
  "ort",
  "prost 0.14.1",
  "prost-types 0.14.1",

@@ -6,10 +6,13 @@ use std::{collections::HashMap, vec};
 
 use inference::grpc_inference_service_server::GrpcInferenceService; // Trait
 use inference::*;
+use ndarray::IxDyn;
+use ort::value::Tensor;
 use tokio::sync::RwLock;
 use tonic::{Request, Response, Status};
 
-use crate::scheduler::ModelProxy;
+use crate::grpc::compat::dyntensor_from_bytes;
+use crate::scheduler::{InferenceRequest, ModelProxy};
 
 #[derive(Clone)]
 pub struct TritonService {
@@ -88,34 +91,78 @@ impl GrpcInferenceService for TritonService {
         }
     }
 
+    // let mut rng = rand::rng();
+    // let input_a = ndarray::Array2::<f32>::from_shape_fn((1024, 1024), |_| rng.random::<f32>());
+    // let input_b = ndarray::Array2::<f32>::from_shape_fn((1024, 1024), |_| rng.random::<f32>());
 
-            // let mut rng = rand::rng();
-        // let input_a = ndarray::Array2::<f32>::from_shape_fn((1024, 1024), |_| rng.random::<f32>());
-        // let input_b = ndarray::Array2::<f32>::from_shape_fn((1024, 1024), |_| rng.random::<f32>());
+    // let data1 = Tensor::from_array(input_a).unwrap().upcast();
+    // let data2 = Tensor::from_array(input_b).unwrap().upcast();
 
-        // let data1 = Tensor::from_array(input_a).unwrap().upcast();
-        // let data2 = Tensor::from_array(input_b).unwrap().upcast();
+    // let mut data: HashMap<String, DynTensor> = HashMap::with_capacity(2);
 
-        // let mut data: HashMap<String, DynTensor> = HashMap::with_capacity(2);
+    // data.insert(String::from("A"), data1);
+    // data.insert(String::from("B"), data2);
 
-        // data.insert(String::from("A"), data1);
-        // data.insert(String::from("B"), data2);
-
-        // match input_tx.send(data) {
-        //     Ok(_) => println!("success"),
-        //     Err(x) => println!("Error {}", x),
-        // }
-
-
+    // match input_tx.send(data) {
+    //     Ok(_) => println!("success"),
+    //     Err(x) => println!("Error {}", x),
+    // }
 
     async fn model_infer(
         &self,
-        _req: Request<ModelInferRequest>,
+        request: Request<ModelInferRequest>,
     ) -> Result<Response<ModelInferResponse>, Status> {
+        let request_ref = request.get_ref();
 
-        println!("infer please");
+        match self
+            .loaded_models
+            .write()
+            .await
+            .get(&request_ref.model_name)
+        {
+            Some(proxy) => {
+                let (sender, receiver) = flume::bounded(1);
+                let mut inputs = HashMap::new();
 
-        todo!()
+                request_ref
+                    .inputs
+                    .iter()
+                    .enumerate()
+                    .for_each(|(i, req_input)| {
+                        // println!(
+                        //     "{} {} {:?} {}",
+                        //     req_input.name,
+                        //     req_input.datatype,
+                        //     (req_input.shape),
+                        //     request_ref.raw_input_contents[i].len()
+                        // );
+                        let dimensions: Vec<usize> = req_input.shape.iter().map(|i| *i as usize).collect();
+                        let tensor = dyntensor_from_bytes(DataType::from_str(&req_input.datatype), &dimensions, &request_ref.raw_input_contents[i]);
+
+                        inputs.insert(req_input.name.clone(), tensor);
+                    });
+
+                let req = InferenceRequest {
+                    inputs,
+                    resp_chan: sender,
+                };
+                proxy.request_sender.send_async(req).await.unwrap();
+                receiver.recv_async().await.unwrap();
+
+                Ok(Response::new(ModelInferResponse {
+                    model_name: proxy.model_config.name.clone(),
+                    model_version: String::from("1"),
+                    id: request_ref.id.clone(),
+                    parameters: HashMap::with_capacity(0),
+                    outputs: vec![],
+                    raw_output_contents: vec![],
+                }))
+            }
+            None => Err(Status::not_found(format!(
+                "Model {} not found",
+                &request_ref.model_name
+            ))),
+        }
     }
 
     async fn model_config(

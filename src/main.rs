@@ -1,11 +1,11 @@
+#![feature(array_chunks)]
 mod grpc;
 mod loader;
 mod scheduler;
-use tonic::{transport::Server, Status};
+use std::{collections::HashMap, sync::Arc};
+use tonic::transport::Server;
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
-use tracing::info;
-use std::{collections::HashMap, sync::Arc};
 
 use http::Request;
 
@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut model_metadata: Option<ModelMetadata> = None;
 
     for _ in 0..4 {
-        let (tx, rx) = flume::bounded(128);
+        let (tx, rx) = flume::bounded(1);
         let cpu_provider = CPUExecutionProvider::default().build();
         let session = Session::builder()
             .unwrap()
@@ -170,14 +170,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     println!("Starting Triton gRPC server on {}", addr);
-    let svc = GrpcInferenceServiceServer::new(service).max_decoding_message_size(128*1024*1024);
+    let svc = GrpcInferenceServiceServer::new(service).max_decoding_message_size(128 * 1024 * 1024);
     Server::builder()
         .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_grpc().make_span_with(|request: &Request<_>| {
+            ServiceBuilder::new().layer(TraceLayer::new_for_grpc().make_span_with(
+                |request: &Request<_>| {
                     println!("Received request: {:?}", request);
                     tracing::info_span!("grpc_request")
-                }))
+                },
+            )),
         )
         .add_service(svc)
         .serve(addr)

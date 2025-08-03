@@ -35,12 +35,14 @@ impl Scheduler {
         let mut current_executor = 0;
         while let Some(inputs) = self.inputs.stream().next().await {
             println!("sending to executor");
+            println!("dispatching to {current_executor}");
             self.executors[current_executor]
                 .sender
-                .send(inputs)
+                .send_async(inputs)
+                .await
                 .unwrap();
             if self.executors[current_executor].sender.is_full() {
-                current_executor += 1 % self.executors.len()
+                current_executor = (current_executor + 1) % self.executors.len()
             }
         }
         println!("stopping scheduler")
