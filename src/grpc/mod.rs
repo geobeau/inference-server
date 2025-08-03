@@ -1,26 +1,26 @@
+pub mod compat;
 pub mod inference;
 
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::pin::Pin;
 use std::sync::Arc;
+use std::{collections::HashMap, vec};
 
-use futures::Stream;
 use inference::grpc_inference_service_server::GrpcInferenceService; // Trait
 use inference::*;
 use tokio::sync::RwLock;
 use tonic::{Request, Response, Status};
 
+use crate::scheduler::ModelProxy;
+
 #[derive(Clone)]
 pub struct TritonService {
     /// Set of model names that are currently considered "loaded"
-    pub loaded_models: Arc<RwLock<HashMap<String, String>>>,
+    pub loaded_models: Arc<RwLock<HashMap<String, ModelProxy>>>,
 }
 
 impl TritonService {
-    pub fn new() -> Self {
+    pub fn new(model_map: Arc<RwLock<HashMap<String, ModelProxy>>>) -> Self {
         TritonService {
-            loaded_models: Arc::from(RwLock::from(HashMap::new())),
+            loaded_models: model_map,
         }
     }
 }
@@ -33,7 +33,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _req: Request<ServerLiveRequest>,
     ) -> Result<Response<ServerLiveResponse>, Status> {
-        // Always live for demonstration
+        println!("is live?");
         Ok(Response::new(ServerLiveResponse { live: true }))
     }
 
@@ -41,6 +41,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _req: Request<ServerReadyRequest>,
     ) -> Result<Response<ServerReadyResponse>, Status> {
+        println!("is server ready?");
         // Ready if server is up (you could check if models loaded, etc.)
         Ok(Response::new(ServerReadyResponse { ready: true }))
     }
@@ -49,6 +50,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         request: Request<ModelReadyRequest>,
     ) -> Result<Response<ModelReadyResponse>, Status> {
+        println!("is model ready?");
         let model_name = request.get_ref().name.clone();
         // For demo, return true if the model is in our loaded set (else false)
         let is_ready = /* check if model_name is loaded */ false;
@@ -59,9 +61,9 @@ impl GrpcInferenceService for TritonService {
         &self,
         _req: Request<ServerMetadataRequest>,
     ) -> Result<Response<ServerMetadataResponse>, Status> {
-        // Return some static metadata
+        println!("server metadata");
         let reply = ServerMetadataResponse {
-            name: "TritonRustServer".to_string(),
+            name: "ortest".to_string(),
             version: "1.0.0-demo".to_string(),
             extensions: vec!["classification".to_string(), "model_repository".to_string()],
         };
@@ -72,42 +74,69 @@ impl GrpcInferenceService for TritonService {
         &self,
         request: Request<ModelMetadataRequest>,
     ) -> Result<Response<ModelMetadataResponse>, Status> {
-        let model_name = request.get_ref().name.clone();
-        // If model is loaded, return dummy metadata; otherwise error
-        if
-        /* model loaded */
-        false {
-            let resp = ModelMetadataResponse {
-                name: model_name,
-                versions: vec!["1".to_string()],
-                platform: "onnxruntime".to_string(),
-                inputs: vec![],
-                outputs: vec![],
-            };
-            Ok(Response::new(resp))
-        } else {
-            Err(Status::not_found(format!("Model {} not found", model_name)))
+        let model_name = &request.get_ref().name;
+        println!("Getting model config for {model_name}");
+        match self.loaded_models.read().await.get(model_name) {
+            Some(proxy) => Ok(Response::new(ModelMetadataResponse {
+                name: model_name.clone(),
+                versions: vec![String::from("1")],
+                platform: String::from("onnxruntime_onnx"),
+                inputs: proxy.model_metadata.input_meta.clone(),
+                outputs: proxy.model_metadata.output_meta.clone(),
+            })),
+            None => Err(Status::not_found(format!("Model {} not found", model_name))),
         }
     }
+
+
+            // let mut rng = rand::rng();
+        // let input_a = ndarray::Array2::<f32>::from_shape_fn((1024, 1024), |_| rng.random::<f32>());
+        // let input_b = ndarray::Array2::<f32>::from_shape_fn((1024, 1024), |_| rng.random::<f32>());
+
+        // let data1 = Tensor::from_array(input_a).unwrap().upcast();
+        // let data2 = Tensor::from_array(input_b).unwrap().upcast();
+
+        // let mut data: HashMap<String, DynTensor> = HashMap::with_capacity(2);
+
+        // data.insert(String::from("A"), data1);
+        // data.insert(String::from("B"), data2);
+
+        // match input_tx.send(data) {
+        //     Ok(_) => println!("success"),
+        //     Err(x) => println!("Error {}", x),
+        // }
+
+
 
     async fn model_infer(
         &self,
         _req: Request<ModelInferRequest>,
     ) -> Result<Response<ModelInferResponse>, Status> {
+
+        println!("infer please");
+
         todo!()
     }
 
     async fn model_config(
         &self,
-        _request: Request<ModelConfigRequest>,
+        request: Request<ModelConfigRequest>,
     ) -> Result<Response<ModelConfigResponse>, Status> {
-        todo!()
+        let model_name = &request.get_ref().name;
+        println!("Getting model config for {model_name}");
+        match self.loaded_models.read().await.get(model_name) {
+            Some(proxy) => Ok(Response::new(ModelConfigResponse {
+                config: Some(proxy.model_config.clone()),
+            })),
+            None => Err(Status::not_found(format!("Model {} not found", model_name))),
+        }
     }
 
     async fn model_statistics(
         &self,
         _request: Request<ModelStatisticsRequest>,
     ) -> Result<Response<ModelStatisticsResponse>, Status> {
+        println!("stat");
         todo!()
     }
 
@@ -115,6 +144,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _request: Request<RepositoryIndexRequest>,
     ) -> Result<Response<RepositoryIndexResponse>, Status> {
+        println!("index");
         // Dummy implementation
         Ok(Response::new(RepositoryIndexResponse { models: vec![] }))
     }
@@ -123,6 +153,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _request: Request<RepositoryModelLoadRequest>,
     ) -> Result<Response<RepositoryModelLoadResponse>, Status> {
+        println!("load");
         // Dummy implementation
         Ok(Response::new(RepositoryModelLoadResponse {}))
     }
@@ -131,6 +162,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _request: Request<RepositoryModelUnloadRequest>,
     ) -> Result<Response<RepositoryModelUnloadResponse>, Status> {
+        println!("unload");
         // Dummy implementation
         Ok(Response::new(RepositoryModelUnloadResponse {}))
     }
@@ -139,6 +171,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _request: Request<SystemSharedMemoryStatusRequest>,
     ) -> Result<Response<SystemSharedMemoryStatusResponse>, Status> {
+        println!("status");
         todo!()
     }
 

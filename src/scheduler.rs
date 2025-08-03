@@ -3,13 +3,31 @@ use std::collections::HashMap;
 use futures::StreamExt;
 use ort::value::{DynTensorValueType, Value};
 
+use crate::grpc::inference::{model_metadata_response::TensorMetadata, ModelConfig};
+
 pub struct ExecutorEndpoint {
-    pub sender: flume::Sender<HashMap<std::string::String, Value<DynTensorValueType>>>,
+    pub sender: flume::Sender<InferenceRequest>,
 }
 
 pub struct Scheduler {
-    pub inputs: flume::Receiver<HashMap<std::string::String, Value<DynTensorValueType>>>,
+    pub inputs: flume::Receiver<InferenceRequest>,
     pub executors: Vec<ExecutorEndpoint>,
+}
+
+pub struct InferenceRequest {
+    pub inputs: HashMap<std::string::String, Value<DynTensorValueType>>,
+    pub resp_chan: flume::Sender<()>,
+}
+
+pub struct ModelMetadata {
+    pub input_meta: Vec<TensorMetadata>,
+    pub output_meta: Vec<TensorMetadata>,
+}
+
+pub struct ModelProxy {
+    pub request_sender: flume::Sender<InferenceRequest>,
+    pub model_config: ModelConfig,
+    pub model_metadata: ModelMetadata,
 }
 
 impl Scheduler {

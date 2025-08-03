@@ -22,6 +22,11 @@ tonic = "0.14"
 tonic-build = "0.14"
 prost = "0.14"
 prost-types = "0.14"
+tower-http = { version = "0.5", features = ["trace"] }
+tower = "0.5.2"
+tracing = "0.1.41"
+http = "1.3.1"
+console-subscriber = "0.4.1"
 
 [build-dependencies]
 tonic-prost-build = "0.14.0"

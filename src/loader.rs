@@ -1,19 +1,21 @@
 use futures::stream::StreamExt;
-use std::collections::HashMap;
 
-use ort::{session::Session, value::DynTensor};
+use ort::session::Session;
+
+use crate::scheduler::InferenceRequest;
 
 pub struct OnnxExecutor {
     pub session: Session,
-    pub inputs: flume::Receiver<HashMap<String, DynTensor>>, // <SessionInputs<'a, 'a>>,
+    pub inputs: flume::Receiver<InferenceRequest>, // <SessionInputs<'a, 'a>>,
 }
 
 impl OnnxExecutor {
     pub async fn run(&mut self) {
         println!("executor started");
         let mut stream = self.inputs.stream();
-        while let Some(inputs) = stream.next().await {
-            self.session.run(inputs).unwrap();
+        while let Some(req) = stream.next().await {
+            self.session.run(req.inputs).unwrap();
+            req.resp_chan.send_async(()).await.unwrap();
         }
 
         println!("Connector disconnected: {}", stream.is_disconnected());

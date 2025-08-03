@@ -1,0 +1,19 @@
+name: "matmul"
+platform: "onnxruntime_onnx"
+backend: "onnxruntime"
+max_batch_size: 0
+
+
+dynamic_batching {
+   max_queue_delay_microseconds: 500
+   default_queue_policy: {
+    default_timeout_microseconds: 50000
+  }
+}
+
+instance_group [{
+  count:2
+},{
+  count:2
+}]
+
