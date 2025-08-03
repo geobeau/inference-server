@@ -1,5 +1,7 @@
+mod grpc;
 mod loader;
 mod scheduler;
+
 use std::collections::HashMap;
 
 use ort::{
@@ -8,9 +10,21 @@ use ort::{
     value::{DynTensor, Tensor},
 };
 use rand::Rng;
+use tonic::transport::Server;
+
+use crate::grpc::{inference::grpc_inference_service_server::GrpcInferenceServiceServer, TritonService};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let addr = "0.0.0.0:8001".parse()?; // Triton default gRPC port is 8001
+                                        // Initialize our service with S3 connection details
+    let service = TritonService::new();
+    println!("Starting Triton gRPC server on {}", addr);
+    Server::builder()
+        .add_service(GrpcInferenceServiceServer::new(service))
+        .serve(addr)
+        .await?;
+
     let (input_tx, input_rx) = flume::bounded(4096);
 
     let mut executor_endpoints = Vec::new();
@@ -65,4 +79,5 @@ async fn main() {
             Err(x) => println!("Error {}", x),
         }
     }
+    Ok(())
 }

@@ -13,7 +13,18 @@ ndarray = "0.16.1"
 ort = { version = "2.0.0-rc.10", features = ["download-binaries"] }
 rand = "0.9.1"
 futures = "0.3.31"
+# S3 SDK crate (see section below for choice)
+rust-s3 = "0.35"    # for example, using rust-s3 library
+tokio-stream = "0.1.17"
+# GRPC Stuff
+tonic-prost = "0.14.0"
+tonic = "0.14"
+tonic-build = "0.14"
+prost = "0.14"
+prost-types = "0.14"
 
+[build-dependencies]
+tonic-prost-build = "0.14.0"
 
 [[bench]]
 name = "matmul_bench"
