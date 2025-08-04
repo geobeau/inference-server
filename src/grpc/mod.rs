@@ -6,13 +6,12 @@ use std::{collections::HashMap, vec};
 
 use inference::grpc_inference_service_server::GrpcInferenceService; // Trait
 use inference::*;
-use ndarray::IxDyn;
-use ort::value::Tensor;
 use tokio::sync::RwLock;
+use tokio::time::Instant;
 use tonic::{Request, Response, Status};
 
 use crate::grpc::compat::dyntensor_from_bytes;
-use crate::scheduler::{InferenceRequest, ModelProxy};
+use crate::scheduler::{InferenceRequest, ModelProxy, TracingData};
 
 #[derive(Clone)]
 pub struct TritonService {
@@ -112,57 +111,86 @@ impl GrpcInferenceService for TritonService {
         &self,
         request: Request<ModelInferRequest>,
     ) -> Result<Response<ModelInferResponse>, Status> {
+        let start: Instant = Instant::now();
         let request_ref = request.get_ref();
+            let mut tracing = TracingData {
+                    start,
+                    serialization_start: None,
+                    dispatch: None,
+                    scheduling_start: None,
+                    executor_start: None,
+                    send_response: None,
+                    process_response: None,
+            };
 
-        match self
-            .loaded_models
-            .write()
-            .await
-            .get(&request_ref.model_name)
+        let proxy: ModelProxy;
         {
-            Some(proxy) => {
-                let (sender, receiver) = flume::bounded(1);
-                let mut inputs = HashMap::new();
-
-                request_ref
-                    .inputs
-                    .iter()
-                    .enumerate()
-                    .for_each(|(i, req_input)| {
-                        // println!(
-                        //     "{} {} {:?} {}",
-                        //     req_input.name,
-                        //     req_input.datatype,
-                        //     (req_input.shape),
-                        //     request_ref.raw_input_contents[i].len()
-                        // );
-                        let dimensions: Vec<usize> = req_input.shape.iter().map(|i| *i as usize).collect();
-                        let tensor = dyntensor_from_bytes(DataType::from_str(&req_input.datatype), &dimensions, &request_ref.raw_input_contents[i]);
-
-                        inputs.insert(req_input.name.clone(), tensor);
-                    });
-
-                let req = InferenceRequest {
-                    inputs,
-                    resp_chan: sender,
-                };
-                proxy.request_sender.send_async(req).await.unwrap();
-                receiver.recv_async().await.unwrap();
-
-                Ok(Response::new(ModelInferResponse {
-                    model_name: proxy.model_config.name.clone(),
-                    model_version: String::from("1"),
-                    id: request_ref.id.clone(),
-                    parameters: HashMap::with_capacity(0),
-                    outputs: vec![],
-                    raw_output_contents: vec![],
-                }))
-            }
-            None => Err(Status::not_found(format!(
-                "Model {} not found",
-                &request_ref.model_name
-            ))),
+            // Force the lock to be dropped
+            proxy = match self
+                .loaded_models
+                .write()
+                .await
+                .get(&request_ref.model_name)
+            {
+                Some(proxy) => {
+                    proxy.clone()
+                },
+                None => return Err(Status::not_found(format!(
+                    "Model {} not found",
+                    &request_ref.model_name
+                ))),
+            };
         }
+
+        let (sender, receiver) = flume::bounded(1);
+        let mut inputs = HashMap::new();
+
+        tracing.serialization_start = Some(tracing.start.elapsed());
+        request_ref
+            .inputs
+            .iter()
+            .enumerate()
+            .for_each(|(i, req_input)| {
+                // println!(
+                //     "{} {} {:?} {}",
+                //     req_input.name,
+                //     req_input.datatype,
+                //     (req_input.shape),
+                //     request_ref.raw_input_contents[i].len()
+                // );
+                let dimensions: Vec<usize> =
+                    req_input.shape.iter().map(|i| *i as usize).collect();
+                let tensor = dyntensor_from_bytes(
+                    DataType::from_str(&req_input.datatype),
+                    &dimensions,
+                    &request_ref.raw_input_contents[i],
+                );
+
+                inputs.insert(req_input.name.clone(), tensor);
+            });
+
+
+        tracing.dispatch = Some(tracing.start.elapsed());
+        let req = InferenceRequest {
+            inputs,
+            resp_chan: sender,
+            tracing,
+        };
+        proxy.request_sender.send_async(req).await.unwrap();
+        tracing = receiver.recv_async().await.unwrap();
+        tracing.process_response = Some(tracing.start.elapsed());
+        println!("{:?}", tracing);
+
+        Ok(Response::new(ModelInferResponse {
+            model_name: proxy.model_config.name.clone(),
+            model_version: String::from("1"),
+            id: request_ref.id.clone(),
+            parameters: HashMap::with_capacity(0),
+            outputs: vec![],
+            raw_output_contents: vec![],
+        }))
+
+
     }
 
     async fn model_config(

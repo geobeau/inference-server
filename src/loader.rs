@@ -13,9 +13,11 @@ impl OnnxExecutor {
     pub async fn run(&mut self) {
         println!("executor started");
         let mut stream = self.inputs.stream();
-        while let Some(req) = stream.next().await {
+        while let Some(mut req) = stream.next().await {
+            req.tracing.executor_start = Some(req.tracing.start.elapsed());
             self.session.run(req.inputs).unwrap();
-            req.resp_chan.send_async(()).await.unwrap();
+            req.tracing.send_response = Some(req.tracing.start.elapsed());
+            req.resp_chan.send_async(req.tracing).await.unwrap();
         }
 
         println!("Connector disconnected: {}", stream.is_disconnected());

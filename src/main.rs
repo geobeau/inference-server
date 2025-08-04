@@ -4,13 +4,9 @@ mod loader;
 mod scheduler;
 use std::{collections::HashMap, sync::Arc};
 use tonic::transport::Server;
-use tower::ServiceBuilder;
-use tower_http::trace::TraceLayer;
-
-use http::Request;
 
 use ort::{
-    execution_providers::CPUExecutionProvider,
+    execution_providers::{CPUExecutionProvider, OpenVINOExecutionProvider},
     session::{builder::GraphOptimizationLevel, Session},
 };
 use tokio::sync::RwLock;
@@ -41,12 +37,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for _ in 0..4 {
         let (tx, rx) = flume::bounded(1);
+        let vino_provider = OpenVINOExecutionProvider::default()
+            .with_device_type("CPU")
+            .build();
         let cpu_provider = CPUExecutionProvider::default().build();
         let session = Session::builder()
             .unwrap()
             .with_optimization_level(GraphOptimizationLevel::Level1)
             .unwrap()
-            .with_execution_providers([cpu_provider])
+            .with_execution_providers([vino_provider])
             .unwrap()
             .with_intra_threads(1)
             .unwrap()
@@ -172,14 +171,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting Triton gRPC server on {}", addr);
     let svc = GrpcInferenceServiceServer::new(service).max_decoding_message_size(128 * 1024 * 1024);
     Server::builder()
-        .layer(
-            ServiceBuilder::new().layer(TraceLayer::new_for_grpc().make_span_with(
-                |request: &Request<_>| {
-                    println!("Received request: {:?}", request);
-                    tracing::info_span!("grpc_request")
-                },
-            )),
-        )
+        // .layer(
+        //     ServiceBuilder::new().layer(TraceLayer::new_for_grpc().make_span_with(
+        //         |request: &Request<_>| {
+        //             println!("Received request: {:?}", request);
+        //             tracing::info_span!("grpc_request")
+        //         },
+        //     )),
+        // )
         .add_service(svc)
         .serve(addr)
         .await?;
