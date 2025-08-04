@@ -1,8 +1,10 @@
+use std::{clone, collections::HashMap};
+
 use futures::stream::StreamExt;
 
 use ort::session::Session;
 
-use crate::scheduler::InferenceRequest;
+use crate::scheduler::{InferenceRequest, InferenceResponse};
 
 pub struct OnnxExecutor {
     pub session: Session,
@@ -15,9 +17,18 @@ impl OnnxExecutor {
         let mut stream = self.inputs.stream();
         while let Some(mut req) = stream.next().await {
             req.tracing.executor_start = Some(req.tracing.start.elapsed());
-            self.session.run(req.inputs).unwrap();
+            let mut session_outputs = self.session.run(req.inputs).unwrap();
             req.tracing.send_response = Some(req.tracing.start.elapsed());
-            req.resp_chan.send_async(req.tracing).await.unwrap();
+
+            let mut outputs: HashMap<String, ort::value::Value> = HashMap::new();
+            let value = session_outputs.remove("output").unwrap();
+            outputs.insert(String::from("output"), value);
+
+            let response = InferenceResponse {
+                outputs: outputs,
+                tracing: req.tracing,
+            };
+            req.resp_chan.send_async(response).await.unwrap();
         }
 
         println!("Connector disconnected: {}", stream.is_disconnected());

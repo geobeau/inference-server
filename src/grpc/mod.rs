@@ -1,16 +1,20 @@
 pub mod compat;
 pub mod inference;
 
+use std::hash::Hash;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::{collections::HashMap, vec};
 
 use inference::grpc_inference_service_server::GrpcInferenceService; // Trait
 use inference::*;
+use ort::value::{TensorValueType, Value, ValueType};
 use tokio::sync::RwLock;
 use tokio::time::Instant;
 use tonic::{Request, Response, Status};
 
 use crate::grpc::compat::dyntensor_from_bytes;
+use crate::grpc::inference::model_infer_response::InferOutputTensor;
 use crate::scheduler::{InferenceRequest, ModelProxy, TracingData};
 
 #[derive(Clone)]
@@ -113,15 +117,15 @@ impl GrpcInferenceService for TritonService {
     ) -> Result<Response<ModelInferResponse>, Status> {
         let start: Instant = Instant::now();
         let request_ref = request.get_ref();
-            let mut tracing = TracingData {
-                    start,
-                    serialization_start: None,
-                    dispatch: None,
-                    scheduling_start: None,
-                    executor_start: None,
-                    send_response: None,
-                    process_response: None,
-            };
+        let mut tracing = TracingData {
+            start,
+            serialization_start: None,
+            dispatch: None,
+            scheduling_start: None,
+            executor_start: None,
+            send_response: None,
+            process_response: None,
+        };
 
         let proxy: ModelProxy;
         {
@@ -132,13 +136,13 @@ impl GrpcInferenceService for TritonService {
                 .await
                 .get(&request_ref.model_name)
             {
-                Some(proxy) => {
-                    proxy.clone()
-                },
-                None => return Err(Status::not_found(format!(
-                    "Model {} not found",
-                    &request_ref.model_name
-                ))),
+                Some(proxy) => proxy.clone(),
+                None => {
+                    return Err(Status::not_found(format!(
+                        "Model {} not found",
+                        &request_ref.model_name
+                    )))
+                }
             };
         }
 
@@ -158,8 +162,7 @@ impl GrpcInferenceService for TritonService {
                 //     (req_input.shape),
                 //     request_ref.raw_input_contents[i].len()
                 // );
-                let dimensions: Vec<usize> =
-                    req_input.shape.iter().map(|i| *i as usize).collect();
+                let dimensions: Vec<usize> = req_input.shape.iter().map(|i| *i as usize).collect();
                 let tensor = dyntensor_from_bytes(
                     DataType::from_str(&req_input.datatype),
                     &dimensions,
@@ -169,7 +172,6 @@ impl GrpcInferenceService for TritonService {
                 inputs.insert(req_input.name.clone(), tensor);
             });
 
-
         tracing.dispatch = Some(tracing.start.elapsed());
         let req = InferenceRequest {
             inputs,
@@ -177,20 +179,45 @@ impl GrpcInferenceService for TritonService {
             tracing,
         };
         proxy.request_sender.send_async(req).await.unwrap();
-        tracing = receiver.recv_async().await.unwrap();
-        tracing.process_response = Some(tracing.start.elapsed());
-        println!("{:?}", tracing);
+        let mut resp = receiver.recv_async().await.unwrap();
+
+        let mut raw_output: Vec<Vec<u8>> = Vec::new();
+
+        let outputs = resp
+            .outputs
+            .iter()
+            .map(|(key, output)| {
+                let data_type = output.data_type();
+
+                let (shape, serial_data) = output.try_extract_tensor::<f64>().unwrap();
+
+                let bytes: Vec<u8> = serial_data
+                    .iter()
+                    .flat_map(|value| value.to_le_bytes())
+                    .collect();
+                raw_output.push(bytes);
+
+                InferOutputTensor {
+                    name: String::from(key),
+                    datatype: DataType::from(data_type.clone()).as_str_name().to_string(),
+                    shape: Vec::from(shape.deref()),
+                    parameters: HashMap::new(),
+                    contents: None,
+                }
+            })
+            .collect();
+
+        resp.tracing.process_response = Some(resp.tracing.start.elapsed());
+        println!("{:?}", resp.tracing);
 
         Ok(Response::new(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),
             model_version: String::from("1"),
             id: request_ref.id.clone(),
             parameters: HashMap::with_capacity(0),
-            outputs: vec![],
-            raw_output_contents: vec![],
+            outputs: outputs,
+            raw_output_contents: raw_output,
         }))
-
-
     }
 
     async fn model_config(

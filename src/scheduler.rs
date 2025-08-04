@@ -17,7 +17,12 @@ pub struct Scheduler {
 
 pub struct InferenceRequest {
     pub inputs: HashMap<std::string::String, Value<DynTensorValueType>>,
-    pub resp_chan: flume::Sender<TracingData>,
+    pub resp_chan: flume::Sender<InferenceResponse>,
+    pub tracing: TracingData,
+}
+
+pub struct InferenceResponse {
+    pub outputs: HashMap<std::string::String, Value>,
     pub tracing: TracingData,
 }
 

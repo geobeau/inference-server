@@ -16,6 +16,7 @@ use crate::{
         inference::{
             grpc_inference_service_server::GrpcInferenceServiceServer,
             model_metadata_response::TensorMetadata, DataType, ModelConfig, ModelInput,
+            ModelOutput,
         },
         TritonService,
     },
@@ -24,7 +25,7 @@ use crate::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    console_subscriber::init();
+    // console_subscriber::init();
     let addr = "0.0.0.0:8001".parse()?; // Triton default gRPC port is 8001
                                         // Initialize our service with S3 connection details
 
@@ -35,6 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut model_config: Option<ModelConfig> = None;
     let mut model_metadata: Option<ModelMetadata> = None;
 
+    let batch_size = 4;
     for _ in 0..4 {
         let (tx, rx) = flume::bounded(1);
         let vino_provider = OpenVINOExecutionProvider::default()
@@ -49,7 +51,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .with_intra_threads(1)
             .unwrap()
-            .commit_from_file("samples/matmul.onnx")
+            .commit_from_file("samples/int64_to_float64.onnx")
+            // .commit_from_file("samples/matmul.onnx")
             .unwrap();
 
         {
@@ -65,6 +68,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .tensor_shape()
                         .unwrap()
                         .iter()
+                        .enumerate()
+                        .skip_while(|(i, dim)| *i == 0 && **dim == -1 && batch_size > 0)
+                        .map(|(_, dim)| dim)
                         .cloned()
                         .collect();
                     // println!("tensor dims {} {:?}", input.name.clone(), tensor_shape);
@@ -79,6 +85,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         allow_ragged_batch: false,
                         optional: false,
                         is_non_linear_format_io: false,
+                    }
+                })
+                .collect();
+
+            let outputs = session
+                .outputs
+                .iter()
+                .map(|output| {
+                    let tensor_type: &DataType = &output.output_type.tensor_type().unwrap().into();
+                    let tensor_shape: Vec<i64> = output
+                        .output_type
+                        .tensor_shape()
+                        .unwrap()
+                        .iter()
+                        .enumerate()
+                        .skip_while(|(i, dim)| *i == 0 && **dim == -1)
+                        .map(|(_, dim)| dim)
+                        .cloned()
+                        .collect();
+                    // println!("tensor dims {} {:?}", input.name.clone(), tensor_shape);
+                    // let tensor_ = input.input_type
+                    ModelOutput {
+                        name: output.name.clone(),
+                        data_type: (*tensor_type).into(),
+                        dims: tensor_shape,
+                        reshape: None,
+                        is_shape_tensor: false,
+                        is_non_linear_format_io: false,
+                        label_filename: String::from(""),
                     }
                 })
                 .collect();
@@ -105,9 +140,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .collect();
 
+            let output_metadata = session
+                .outputs
+                .iter()
+                .map(|output| {
+                    let tensor_type: &DataType = &output.output_type.tensor_type().unwrap().into();
+                    let tensor_shape: Vec<i64> = output
+                        .output_type
+                        .tensor_shape()
+                        .unwrap()
+                        .iter()
+                        .cloned()
+                        .collect();
+                    // println!("tensor shape {} {:?}", input.name.clone(), tensor_shape);
+                    // let tensor_ = input.input_type
+                    TensorMetadata {
+                        name: output.name.clone(),
+                        datatype: tensor_type.to_metadata_string(),
+                        shape: tensor_shape,
+                    }
+                })
+                .collect();
+
             model_metadata = Some(ModelMetadata {
                 input_meta: input_metadata,
-                output_meta: vec![],
+                output_meta: output_metadata,
             });
 
             model_config = Some(ModelConfig {
@@ -116,9 +173,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 backend: String::from("onnxruntime"),
                 runtime: String::from("onnxruntime"),
                 version_policy: None,
-                max_batch_size: 0,
+                max_batch_size: batch_size,
                 input: inputs,
-                output: vec![],
+                output: outputs,
                 batch_input: vec![],
                 batch_output: vec![],
                 optimization: None,
