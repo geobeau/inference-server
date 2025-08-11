@@ -22,7 +22,7 @@ pub struct InferenceRequest {
 }
 
 pub struct InferenceResponse {
-    pub outputs: HashMap<std::string::String, Value>,
+    pub outputs: HashMap<std::string::String, Value<DynTensorValueType>>,
     pub tracing: TracingData,
 }
 

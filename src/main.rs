@@ -36,8 +36,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut model_config: Option<ModelConfig> = None;
     let mut model_metadata: Option<ModelMetadata> = None;
 
-    let batch_size = 4;
-    for _ in 0..4 {
+    let batch_size = 64;
+    for _ in 0..1 {
         let (tx, rx) = flume::bounded(1);
         let vino_provider = OpenVINOExecutionProvider::default()
             .with_device_type("CPU")

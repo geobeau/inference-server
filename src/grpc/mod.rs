@@ -208,7 +208,7 @@ impl GrpcInferenceService for TritonService {
             .collect();
 
         resp.tracing.process_response = Some(resp.tracing.start.elapsed());
-        println!("{:?}", resp.tracing);
+        // println!("{:?}", resp.tracing);
 
         Ok(Response::new(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),
