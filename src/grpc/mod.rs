@@ -190,12 +190,13 @@ impl GrpcInferenceService for TritonService {
                 let data_type = output.data_type();
 
                 let (shape, serial_data) = output.try_extract_tensor::<f64>().unwrap();
-
                 let bytes: Vec<u8> = serial_data
                     .iter()
                     .flat_map(|value| value.to_le_bytes())
                     .collect();
                 raw_output.push(bytes);
+
+                println!("output tensor {:?}", serial_data);
 
                 InferOutputTensor {
                     name: String::from(key),

@@ -147,7 +147,11 @@ pub fn dyntensor_from_bytes(
         DataType::TypeInt64 => {
             let data = bytes
                 .array_chunks()
-                .map(|d: &[u8; 8]| i64::from_le_bytes(*d))
+                .map(|d: &[u8; 8]| {
+                    let data = i64::from_le_bytes(*d);
+                    println!("input {}", data);
+                    data
+                })
                 .collect();
             let array = ndarray::Array::from_shape_vec(IxDyn(dimensions), data).unwrap();
             Tensor::from_array(array).unwrap().upcast()

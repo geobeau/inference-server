@@ -218,7 +218,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut model_map = HashMap::new();
-    model_map.insert(String::from("matmul"), model_proxy);
+    model_map.insert(String::from("Int64ToFloat64Model"), model_proxy);
     let service = TritonService::new(Arc::from(RwLock::from(model_map)));
 
     tokio::spawn(async move {
