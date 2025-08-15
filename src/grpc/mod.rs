@@ -8,12 +8,12 @@ use std::{collections::HashMap, vec};
 use inference::grpc_inference_service_server::GrpcInferenceService; // Trait
 use inference::*;
 use tokio::sync::RwLock;
-use tokio::time::Instant;
 use tonic::{Request, Response, Status};
 
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
-use crate::scheduler::{InferenceRequest, ModelProxy, TracingData};
+use crate::scheduler::{InferenceRequest, ModelProxy};
 use crate::tensor::dyntensor_from_bytes;
+use crate::tracing::Trace;
 
 #[derive(Clone)]
 pub struct TritonService {
@@ -113,17 +113,8 @@ impl GrpcInferenceService for TritonService {
         &self,
         request: Request<ModelInferRequest>,
     ) -> Result<Response<ModelInferResponse>, Status> {
-        let start: Instant = Instant::now();
         let request_ref = request.get_ref();
-        let mut tracing = TracingData {
-            start,
-            serialization_start: None,
-            dispatch: None,
-            scheduling_start: None,
-            executor_start: None,
-            send_response: None,
-            process_response: None,
-        };
+        let mut trace = Trace::start();
 
         let proxy: ModelProxy;
         {
@@ -147,7 +138,7 @@ impl GrpcInferenceService for TritonService {
         let (sender, receiver) = flume::bounded(1);
         let mut inputs = HashMap::new();
 
-        tracing.serialization_start = Some(tracing.start.elapsed());
+        trace.record_serialization_start();
         request_ref
             .inputs
             .iter()
@@ -170,11 +161,11 @@ impl GrpcInferenceService for TritonService {
                 inputs.insert(req_input.name.clone(), tensor);
             });
 
-        tracing.dispatch = Some(tracing.start.elapsed());
+        trace.record_dispatch();
         let req = InferenceRequest {
             inputs,
             resp_chan: sender,
-            tracing,
+            trace,
         };
         proxy.request_sender.send_async(req).await.unwrap();
         let mut resp = receiver.recv_async().await.unwrap();
@@ -206,8 +197,8 @@ impl GrpcInferenceService for TritonService {
             })
             .collect();
 
-        resp.tracing.process_response = Some(resp.tracing.start.elapsed());
-        // println!("{:?}", resp.tracing);
+        resp.trace.record_process_response();
+        println!("{:?}", resp.trace);
 
         Ok(Response::new(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),

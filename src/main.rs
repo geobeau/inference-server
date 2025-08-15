@@ -3,6 +3,7 @@ mod grpc;
 mod loader;
 mod scheduler;
 mod tensor;
+mod tracing;
 use std::{collections::HashMap, sync::Arc};
 use tonic::transport::Server;
 

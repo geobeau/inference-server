@@ -1,10 +1,12 @@
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
 
 use futures::StreamExt;
 use ort::value::{DynTensorValueType, Value};
-use tokio::time::Instant;
 
-use crate::grpc::inference::{model_metadata_response::TensorMetadata, ModelConfig};
+use crate::{
+    grpc::inference::{model_metadata_response::TensorMetadata, ModelConfig},
+    tracing::Trace,
+};
 
 pub struct ExecutorEndpoint {
     pub sender: flume::Sender<InferenceRequest>,
@@ -18,23 +20,12 @@ pub struct Scheduler {
 pub struct InferenceRequest {
     pub inputs: HashMap<std::string::String, Value<DynTensorValueType>>,
     pub resp_chan: flume::Sender<InferenceResponse>,
-    pub tracing: TracingData,
+    pub trace: Trace,
 }
 
 pub struct InferenceResponse {
     pub outputs: HashMap<std::string::String, Value<DynTensorValueType>>,
-    pub tracing: TracingData,
-}
-
-#[derive(Debug)]
-pub struct TracingData {
-    pub start: Instant,
-    pub serialization_start: Option<Duration>,
-    pub dispatch: Option<Duration>,
-    pub scheduling_start: Option<Duration>,
-    pub executor_start: Option<Duration>,
-    pub send_response: Option<Duration>,
-    pub process_response: Option<Duration>,
+    pub trace: Trace,
 }
 
 #[derive(Clone)]
@@ -54,7 +45,7 @@ impl Scheduler {
     pub async fn run(&mut self) {
         let mut current_executor = 0;
         while let Some(mut request) = self.inputs.stream().next().await {
-            request.tracing.scheduling_start = Some(request.tracing.start.elapsed());
+            request.trace.record_scheduling_start();
             self.executors[current_executor]
                 .sender
                 .send_async(request)

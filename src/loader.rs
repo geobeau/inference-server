@@ -18,7 +18,7 @@ impl OnnxExecutor {
         let mut stream = self.inputs.stream();
         let batch_size = 2;
         let mut batched_requests_chan = Vec::new();
-        let mut batched_requests_tracing = Vec::new();
+        let mut batched_requests_trace = Vec::new();
 
         let mut input_batch = BatchableInputs::new(&self.session.inputs, batch_size as i64);
 
@@ -33,10 +33,10 @@ impl OnnxExecutor {
         loop {
             // Batch requests
             while let Some(mut req) = stream.next().await {
-                req.tracing.executor_start = Some(req.tracing.start.elapsed());
+                req.trace.record_executor_start();
                 input_batch.append_inputs(req.inputs);
                 batched_requests_chan.push(req.resp_chan);
-                batched_requests_tracing.push(req.tracing);
+                batched_requests_trace.push(req.trace);
                 if batched_requests_chan.len() == batch_size {
                     break;
                 }
@@ -48,11 +48,9 @@ impl OnnxExecutor {
             while let Some(response_chan) = batched_requests_chan.pop() {
                 let outputs = batched_tensor.pop_outputs();
 
-                let trace = batched_requests_tracing.pop().unwrap();
-                let response = InferenceResponse {
-                    outputs,
-                    tracing: trace,
-                };
+                let mut trace = batched_requests_trace.pop().unwrap();
+                trace.record_send_response();
+                let response = InferenceResponse { outputs, trace };
                 response_chan.send_async(response).await.unwrap();
             }
             input_batch.clear();
