@@ -2,6 +2,7 @@
 mod grpc;
 mod loader;
 mod scheduler;
+mod tensor;
 use std::{collections::HashMap, sync::Arc};
 use tonic::transport::Server;
 
@@ -42,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let vino_provider = OpenVINOExecutionProvider::default()
             .with_device_type("CPU")
             .build();
-        let cpu_provider = CPUExecutionProvider::default().build();
+        let _cpu_provider = CPUExecutionProvider::default().build();
         let session = Session::builder()
             .unwrap()
             .with_optimization_level(GraphOptimizationLevel::Level1)

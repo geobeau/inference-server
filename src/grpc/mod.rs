@@ -11,9 +11,9 @@ use tokio::sync::RwLock;
 use tokio::time::Instant;
 use tonic::{Request, Response, Status};
 
-use crate::grpc::compat::dyntensor_from_bytes;
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
 use crate::scheduler::{InferenceRequest, ModelProxy, TracingData};
+use crate::tensor::dyntensor_from_bytes;
 
 #[derive(Clone)]
 pub struct TritonService {
@@ -55,7 +55,7 @@ impl GrpcInferenceService for TritonService {
         request: Request<ModelReadyRequest>,
     ) -> Result<Response<ModelReadyResponse>, Status> {
         println!("is model ready?");
-        let model_name = request.get_ref().name.clone();
+        let _ = request.get_ref().name.clone();
         // For demo, return true if the model is in our loaded set (else false)
         let is_ready = /* check if model_name is loaded */ false;
         Ok(Response::new(ModelReadyResponse { ready: is_ready }))
