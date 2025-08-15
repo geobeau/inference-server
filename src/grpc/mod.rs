@@ -1,14 +1,12 @@
 pub mod compat;
 pub mod inference;
 
-use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{collections::HashMap, vec};
 
 use inference::grpc_inference_service_server::GrpcInferenceService; // Trait
 use inference::*;
-use ort::value::{TensorValueType, Value, ValueType};
 use tokio::sync::RwLock;
 use tokio::time::Instant;
 use tonic::{Request, Response, Status};
@@ -69,7 +67,7 @@ impl GrpcInferenceService for TritonService {
     ) -> Result<Response<ServerMetadataResponse>, Status> {
         println!("server metadata");
         let reply = ServerMetadataResponse {
-            name: "ortest".to_string(),
+            name: "inference-server".to_string(),
             version: "1.0.0-demo".to_string(),
             extensions: vec!["classification".to_string(), "model_repository".to_string()],
         };
@@ -200,7 +198,7 @@ impl GrpcInferenceService for TritonService {
 
                 InferOutputTensor {
                     name: String::from(key),
-                    datatype: DataType::from(data_type.clone()).as_str_name().to_string(),
+                    datatype: DataType::from(*data_type).as_str_name().to_string(),
                     shape: Vec::from(shape.deref()),
                     parameters: HashMap::new(),
                     contents: None,
@@ -216,7 +214,7 @@ impl GrpcInferenceService for TritonService {
             model_version: String::from("1"),
             id: request_ref.id.clone(),
             parameters: HashMap::with_capacity(0),
-            outputs: outputs,
+            outputs,
             raw_output_contents: raw_output,
         }))
     }

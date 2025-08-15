@@ -1,22 +1,15 @@
-use std::{clone, collections::HashMap};
+use std::collections::HashMap;
 
-use futures::{future::Map, stream::StreamExt};
+use futures::stream::StreamExt;
 
-use ndarray::{stack, Axis};
 use ort::{
-    memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
-    session::{Input, Output, Session, SessionInputValue, SessionOutputs},
+    memory::Allocator,
+    session::{Input, Session, SessionOutputs},
     tensor::{Shape, TensorElementType},
-    value::{
-        DynTensor, DynTensorValueType, DynValue, Tensor, TensorArrayData, Value, ValueRef,
-        ValueType,
-    },
+    value::{DynTensor, DynTensorValueType, DynValue, ValueRef, ValueType},
 };
 
-use crate::{
-    grpc::inference::batch_output,
-    scheduler::{InferenceRequest, InferenceResponse},
-};
+use crate::scheduler::{InferenceRequest, InferenceResponse};
 
 pub struct OnnxExecutor {
     pub session: Session,
@@ -65,7 +58,10 @@ impl BatchableInputs {
         inputs.iter().for_each(|input| {
             let shape = input.input_type.tensor_shape().unwrap();
             let data_type = input.input_type.tensor_type().unwrap();
-            inner_inputs.insert(input.name.clone(), BatchableTensor::new(data_type, shape, batch_size));
+            inner_inputs.insert(
+                input.name.clone(),
+                BatchableTensor::new(data_type, shape, batch_size),
+            );
         });
 
         BatchableInputs {
@@ -85,7 +81,7 @@ impl BatchableInputs {
         self.inputs.iter().for_each(|(name, batch_tensor)| {
             all_inputs.insert(name.clone(), batch_tensor.inner_tensor.view());
         });
-        return all_inputs;
+        all_inputs
     }
 
     fn clear(&mut self) {
@@ -118,7 +114,7 @@ impl BatchedOutputs {
         self.outputs.iter_mut().for_each(|(name, batch_tensor)| {
             outputs.insert(name.clone(), batch_tensor.pop());
         });
-        return outputs;
+        outputs
     }
 }
 
@@ -130,7 +126,7 @@ impl BatchedTensor {
         // the shape of each sub tensor
         shape[0] = 1;
         BatchedTensor {
-            data_type: dyn_value.data_type().clone(),
+            data_type: *dyn_value.data_type(),
             tensor_shape: shape,
             inner_tensor: dyn_value,
             offset,
@@ -196,7 +192,7 @@ impl BatchedTensor {
             TensorElementType::Undefined => todo!(),
         };
         self.offset = new_offset;
-        return tensor;
+        tensor
     }
 }
 
@@ -281,7 +277,7 @@ impl OnnxExecutor {
         let mut input_batch = BatchableInputs::new(&self.session.inputs, batch_size as i64);
 
         let (ty, mut shape) = match &self.session.outputs[0].output_type {
-            ValueType::Tensor { ty, shape, .. } => (ty.clone(), shape.clone()),
+            ValueType::Tensor { ty, shape, .. } => (*ty, shape.clone()),
             ValueType::Sequence(_) => todo!(),
             ValueType::Map { .. } => todo!(),
             ValueType::Optional(_) => todo!(),
@@ -308,7 +304,7 @@ impl OnnxExecutor {
 
                 let trace = batched_requests_tracing.pop().unwrap();
                 let response = InferenceResponse {
-                    outputs: outputs,
+                    outputs,
                     tracing: trace,
                 };
                 response_chan.send_async(response).await.unwrap();
