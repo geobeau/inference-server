@@ -2,7 +2,6 @@ pub struct BatchableTensor {
     pub inner_tensor: DynTensor,
     pub offset: usize,
     pub data_type: TensorElementType,
-    pub shape: Shape,
 }
 
 pub struct BatchedTensor {
@@ -186,7 +185,6 @@ impl BatchableTensor {
         BatchableTensor {
             inner_tensor: DynTensor::new(&Allocator::default(), data_type, batch_shape).unwrap(),
             data_type,
-            shape: shape.clone(),
             offset: 0,
         }
     }
