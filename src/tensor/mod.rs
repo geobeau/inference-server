@@ -103,7 +103,6 @@ impl BatchedTensor {
     fn from(dyn_value: DynValue) -> BatchedTensor {
         let mut shape = dyn_value.shape().clone();
         let offset = shape.num_elements();
-        println!("ouput: {shape}");
         // the shape of each sub tensor
         shape[0] = 1;
         BatchedTensor {
@@ -115,7 +114,6 @@ impl BatchedTensor {
     }
 
     fn pop(&mut self) -> DynTensor {
-        println!("pop once");
         let new_offset = self.offset - self.tensor_shape.num_elements();
         let mut tensor = DynTensor::new(
             &Allocator::default(),
@@ -395,11 +393,8 @@ pub fn dyntensor_from_bytes(data_type: DataType, dimensions: &[usize], bytes: &[
         DataType::TypeInt64 => {
             let data = bytes
                 .array_chunks()
-                .map(|d: &[u8; 8]| {
-                    let data = i64::from_le_bytes(*d);
-                    println!("input {}", data);
-                    data
-                })
+                .map(|d: &[u8; 8]| i64::from_le_bytes(*d)
+                )
                 .collect();
             let array = ndarray::Array::from_shape_vec(IxDyn(dimensions), data).unwrap();
             Tensor::from_array(array).unwrap().upcast()

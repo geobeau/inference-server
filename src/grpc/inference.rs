@@ -116,7 +116,9 @@ pub struct ModelInstanceGroup {
     /// @@     instance group. Optional.
     /// @@
     #[prost(message, repeated, tag = "8")]
-    pub secondary_devices: ::prost::alloc::vec::Vec<model_instance_group::SecondaryDevice>,
+    pub secondary_devices: ::prost::alloc::vec::Vec<
+        model_instance_group::SecondaryDevice,
+    >,
     /// @@  .. cpp:var:: string profile (repeated)
     /// @@
     /// @@     For TensorRT models containing multiple optimization profile, this
@@ -178,7 +180,15 @@ pub mod model_instance_group {
         /// @@     The kind of the secondary device.
         /// @@
         #[derive(
-            Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration,
+            Clone,
+            Copy,
+            Debug,
+            PartialEq,
+            Eq,
+            Hash,
+            PartialOrd,
+            Ord,
+            ::prost::Enumeration
         )]
         #[repr(i32)]
         pub enum SecondaryDeviceKind {
@@ -213,7 +223,17 @@ pub mod model_instance_group {
     /// @@
     /// @@     Kind of this instance group.
     /// @@
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
     #[repr(i32)]
     pub enum Kind {
         /// @@    .. cpp:enumerator:: Kind::KIND_AUTO = 0
@@ -369,7 +389,17 @@ pub mod model_input {
     /// @@
     /// @@     The format for the input.
     /// @@
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
     #[repr(i32)]
     pub enum Format {
         /// @@    .. cpp:enumerator:: Format::FORMAT_NONE = 0
@@ -522,7 +552,17 @@ pub mod batch_input {
     /// @@
     /// @@       The kind of the batch input.
     /// @@
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
     #[repr(i32)]
     pub enum Kind {
         /// @@      .. cpp:enumerator:: Kind::BATCH_ELEMENT_COUNT = 0
@@ -600,11 +640,15 @@ pub mod batch_input {
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {
                 "BATCH_ELEMENT_COUNT" => Some(Self::BatchElementCount),
-                "BATCH_ACCUMULATED_ELEMENT_COUNT" => Some(Self::BatchAccumulatedElementCount),
+                "BATCH_ACCUMULATED_ELEMENT_COUNT" => {
+                    Some(Self::BatchAccumulatedElementCount)
+                }
                 "BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO" => {
                     Some(Self::BatchAccumulatedElementCountWithZero)
                 }
-                "BATCH_MAX_ELEMENT_COUNT_AS_SHAPE" => Some(Self::BatchMaxElementCountAsShape),
+                "BATCH_MAX_ELEMENT_COUNT_AS_SHAPE" => {
+                    Some(Self::BatchMaxElementCountAsShape)
+                }
                 "BATCH_ITEM_SHAPE" => Some(Self::BatchItemShape),
                 "BATCH_ITEM_SHAPE_FLATTEN" => Some(Self::BatchItemShapeFlatten),
                 _ => None,
@@ -647,7 +691,17 @@ pub mod batch_output {
     /// @@
     /// @@     The kind of the batch output.
     /// @@
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
     #[repr(i32)]
     pub enum Kind {
         /// @@    .. cpp:enumerator:: Kind::BATCH_SCATTER_WITH_INPUT_SHAPE = 0
@@ -671,7 +725,9 @@ pub mod batch_output {
         /// Creates an enum from field names used in the ProtoBuf definition.
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {
-                "BATCH_SCATTER_WITH_INPUT_SHAPE" => Some(Self::BatchScatterWithInputShape),
+                "BATCH_SCATTER_WITH_INPUT_SHAPE" => {
+                    Some(Self::BatchScatterWithInputShape)
+                }
                 _ => None,
             }
         }
@@ -790,8 +846,9 @@ pub struct ModelOptimizationPolicy {
     /// @@     The accelerators used for the model. Optional.
     /// @@
     #[prost(message, optional, tag = "4")]
-    pub execution_accelerators:
-        ::core::option::Option<model_optimization_policy::ExecutionAccelerators>,
+    pub execution_accelerators: ::core::option::Option<
+        model_optimization_policy::ExecutionAccelerators,
+    >,
     /// @@  .. cpp:var:: PinnedMemoryBuffer input_pinned_memory
     /// @@
     /// @@     Use pinned memory buffer when the data transfer for inputs
@@ -799,7 +856,9 @@ pub struct ModelOptimizationPolicy {
     /// @@     Default is true.
     /// @@
     #[prost(message, optional, tag = "5")]
-    pub input_pinned_memory: ::core::option::Option<model_optimization_policy::PinnedMemoryBuffer>,
+    pub input_pinned_memory: ::core::option::Option<
+        model_optimization_policy::PinnedMemoryBuffer,
+    >,
     /// @@  .. cpp:var:: PinnedMemoryBuffer output_pinned_memory
     /// @@
     /// @@     Use pinned memory buffer when the data transfer for outputs
@@ -807,7 +866,9 @@ pub struct ModelOptimizationPolicy {
     /// @@     Default is true.
     /// @@
     #[prost(message, optional, tag = "6")]
-    pub output_pinned_memory: ::core::option::Option<model_optimization_policy::PinnedMemoryBuffer>,
+    pub output_pinned_memory: ::core::option::Option<
+        model_optimization_policy::PinnedMemoryBuffer,
+    >,
     /// @@  .. cpp:var:: uint32 gather_kernel_buffer_threshold
     /// @@
     /// @@     The backend may use a gather kernel to gather input data if the
@@ -925,8 +986,10 @@ pub mod model_optimization_policy {
             /// @@         input without batching dimension.
             /// @@
             #[prost(map = "string, message", tag = "2")]
-            pub input:
-                ::std::collections::HashMap<::prost::alloc::string::String, graph_spec::Shape>,
+            pub input: ::std::collections::HashMap<
+                ::prost::alloc::string::String,
+                graph_spec::Shape,
+            >,
             /// @@      .. cpp:var:: LowerBound graph_lower_bound
             /// @@
             /// @@         Specify the lower bound of the CUDA graph. Optional.
@@ -974,7 +1037,10 @@ pub mod model_optimization_policy {
                 /// @@         the input without batching dimension.
                 /// @@
                 #[prost(map = "string, message", tag = "2")]
-                pub input: ::std::collections::HashMap<::prost::alloc::string::String, Shape>,
+                pub input: ::std::collections::HashMap<
+                    ::prost::alloc::string::String,
+                    Shape,
+                >,
             }
         }
     }
@@ -1035,8 +1101,9 @@ pub mod model_optimization_policy {
         /// @@       created with KIND_GPU.
         /// @@
         #[prost(message, repeated, tag = "1")]
-        pub gpu_execution_accelerator:
-            ::prost::alloc::vec::Vec<execution_accelerators::Accelerator>,
+        pub gpu_execution_accelerator: ::prost::alloc::vec::Vec<
+            execution_accelerators::Accelerator,
+        >,
         /// @@    .. cpp:var:: Accelerator cpu_execution_accelerator (repeated)
         /// @@
         /// @@       The preferred execution provider to be used if the model instance
@@ -1046,8 +1113,9 @@ pub mod model_optimization_policy {
         /// @@       and no parameters are required.
         /// @@
         #[prost(message, repeated, tag = "2")]
-        pub cpu_execution_accelerator:
-            ::prost::alloc::vec::Vec<execution_accelerators::Accelerator>,
+        pub cpu_execution_accelerator: ::prost::alloc::vec::Vec<
+            execution_accelerators::Accelerator,
+        >,
     }
     /// Nested message and enum types in `ExecutionAccelerators`.
     pub mod execution_accelerators {
@@ -1106,7 +1174,17 @@ pub mod model_optimization_policy {
     /// @@     preference over models at lower priorities. Current model
     /// @@     priorities only work for TensorRT models.
     /// @@
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
     #[repr(i32)]
     pub enum ModelPriority {
         /// @@    .. cpp:enumerator:: ModelPriority::PRIORITY_DEFAULT = 0
@@ -1199,7 +1277,17 @@ pub mod model_queue_policy {
     /// @@
     /// @@     The action applied to timed-out requests.
     /// @@
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
     #[repr(i32)]
     pub enum TimeoutAction {
         /// @@    .. cpp:enumerator:: Action::REJECT = 0
@@ -1430,7 +1518,15 @@ pub mod model_sequence_batching {
         /// @@       The kind of the control.
         /// @@
         #[derive(
-            Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration,
+            Clone,
+            Copy,
+            Debug,
+            PartialEq,
+            Eq,
+            Hash,
+            PartialOrd,
+            Ord,
+            ::prost::Enumeration
         )]
         #[repr(i32)]
         pub enum Kind {
@@ -1882,7 +1978,10 @@ pub struct ModelWarmup {
     /// @@     control tensors.
     /// @@
     #[prost(map = "string, message", tag = "3")]
-    pub inputs: ::std::collections::HashMap<::prost::alloc::string::String, model_warmup::Input>,
+    pub inputs: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        model_warmup::Input,
+    >,
     /// @@  .. cpp:var:: uint32 count
     /// @@
     /// @@     The number of iterations that this warmup sample will be executed.
@@ -2274,8 +2373,10 @@ pub struct ModelConfig {
     /// @@     refers to a file within the model version directory.
     /// @@
     #[prost(map = "string, string", tag = "9")]
-    pub cc_model_filenames:
-        ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
+    pub cc_model_filenames: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
     /// @@  .. cpp:var:: map\<string,string> metric_tags
     /// @@
     /// @@     Optional metric tags. User-specific key-value pairs for metrics
@@ -2283,14 +2384,19 @@ pub struct ModelConfig {
     /// @@     reported on the HTTP metrics port.
     /// @@
     #[prost(map = "string, string", tag = "10")]
-    pub metric_tags:
-        ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
+    pub metric_tags: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
     /// @@  .. cpp:var:: map\<string,ModelParameter> parameters
     /// @@
     /// @@     Optional model parameters. User-specified parameter values.
     /// @@
     #[prost(map = "string, message", tag = "14")]
-    pub parameters: ::std::collections::HashMap<::prost::alloc::string::String, ModelParameter>,
+    pub parameters: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ModelParameter,
+    >,
     /// @@  .. cpp:var:: ModelWarmup model_warmup (repeated)
     /// @@
     /// @@     Warmup setting of this model. If specified, all instances
@@ -2871,7 +2977,10 @@ pub struct ModelInferRequest {
     /// @@     Optional inference parameters.
     /// @@
     #[prost(map = "string, message", tag = "4")]
-    pub parameters: ::std::collections::HashMap<::prost::alloc::string::String, InferParameter>,
+    pub parameters: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        InferParameter,
+    >,
     /// @@
     /// @@  .. cpp:var:: InferInputTensor inputs (repeated)
     /// @@
@@ -2887,7 +2996,9 @@ pub struct ModelInferRequest {
     /// @@     returned.
     /// @@
     #[prost(message, repeated, tag = "6")]
-    pub outputs: ::prost::alloc::vec::Vec<model_infer_request::InferRequestedOutputTensor>,
+    pub outputs: ::prost::alloc::vec::Vec<
+        model_infer_request::InferRequestedOutputTensor,
+    >,
     /// @@
     /// @@  .. cpp:var:: bytes raw_input_contents
     /// @@
@@ -2949,8 +3060,10 @@ pub mod model_infer_request {
         /// @@       Optional inference input tensor parameters.
         /// @@
         #[prost(map = "string, message", tag = "4")]
-        pub parameters:
-            ::std::collections::HashMap<::prost::alloc::string::String, super::InferParameter>,
+        pub parameters: ::std::collections::HashMap<
+            ::prost::alloc::string::String,
+            super::InferParameter,
+        >,
         /// @@    .. cpp:var:: InferTensorContents contents
         /// @@
         /// @@       The tensor contents using a data-type format. This field
@@ -2979,8 +3092,10 @@ pub mod model_infer_request {
         /// @@       Optional requested output tensor parameters.
         /// @@
         #[prost(map = "string, message", tag = "2")]
-        pub parameters:
-            ::std::collections::HashMap<::prost::alloc::string::String, super::InferParameter>,
+        pub parameters: ::std::collections::HashMap<
+            ::prost::alloc::string::String,
+            super::InferParameter,
+        >,
     }
 }
 /// @@
@@ -3013,7 +3128,10 @@ pub struct ModelInferResponse {
     /// @@     Optional inference response parameters.
     /// @@
     #[prost(map = "string, message", tag = "4")]
-    pub parameters: ::std::collections::HashMap<::prost::alloc::string::String, InferParameter>,
+    pub parameters: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        InferParameter,
+    >,
     /// @@
     /// @@  .. cpp:var:: InferOutputTensor outputs (repeated)
     /// @@
@@ -3082,8 +3200,10 @@ pub mod model_infer_response {
         /// @@       Optional output tensor parameters.
         /// @@
         #[prost(map = "string, message", tag = "4")]
-        pub parameters:
-            ::std::collections::HashMap<::prost::alloc::string::String, super::InferParameter>,
+        pub parameters: ::std::collections::HashMap<
+            ::prost::alloc::string::String,
+            super::InferParameter,
+        >,
         /// @@    .. cpp:var:: InferTensorContents contents
         /// @@
         /// @@       The tensor contents using a data-type format. This field
@@ -3473,8 +3593,10 @@ pub struct ModelStatistics {
     /// @@     response statistics.
     /// @@
     #[prost(map = "string, message", tag = "9")]
-    pub response_stats:
-        ::std::collections::HashMap<::prost::alloc::string::String, InferResponseStatistics>,
+    pub response_stats: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        InferResponseStatistics,
+    >,
 }
 /// @@
 /// @@.. cpp:var:: message ModelStatisticsResponse
@@ -3502,11 +3624,10 @@ pub struct ModelRepositoryParameter {
     /// @@     The parameter value can be a string, an int64 or
     /// @@     a boolean
     /// @@
-    #[prost(
-        oneof = "model_repository_parameter::ParameterChoice",
-        tags = "1, 2, 3, 4"
-    )]
-    pub parameter_choice: ::core::option::Option<model_repository_parameter::ParameterChoice>,
+    #[prost(oneof = "model_repository_parameter::ParameterChoice", tags = "1, 2, 3, 4")]
+    pub parameter_choice: ::core::option::Option<
+        model_repository_parameter::ParameterChoice,
+    >,
 }
 /// Nested message and enum types in `ModelRepositoryParameter`.
 pub mod model_repository_parameter {
@@ -3642,8 +3763,10 @@ pub struct RepositoryModelLoadRequest {
     /// @@     Optional model repository request parameters.
     /// @@
     #[prost(map = "string, message", tag = "3")]
-    pub parameters:
-        ::std::collections::HashMap<::prost::alloc::string::String, ModelRepositoryParameter>,
+    pub parameters: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ModelRepositoryParameter,
+    >,
 }
 /// @@
 /// @@.. cpp:var:: message RepositoryModelLoadResponse
@@ -3677,8 +3800,10 @@ pub struct RepositoryModelUnloadRequest {
     /// @@     Optional model repository request parameters.
     /// @@
     #[prost(map = "string, message", tag = "3")]
-    pub parameters:
-        ::std::collections::HashMap<::prost::alloc::string::String, ModelRepositoryParameter>,
+    pub parameters: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ModelRepositoryParameter,
+    >,
 }
 /// @@
 /// @@.. cpp:var:: message RepositoryModelUnloadResponse
@@ -4140,10 +4265,10 @@ pub mod grpc_inference_service_client {
         dead_code,
         missing_docs,
         clippy::wildcard_imports,
-        clippy::let_unit_value
+        clippy::let_unit_value,
     )]
-    use tonic::codegen::http::Uri;
     use tonic::codegen::*;
+    use tonic::codegen::http::Uri;
     /// @@
     /// @@.. cpp:var:: service InferenceService
     /// @@
@@ -4192,8 +4317,9 @@ pub mod grpc_inference_service_client {
                     <T as tonic::client::GrpcService<tonic::body::Body>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::Body>>>::Error:
-                Into<StdError> + std::marker::Send + std::marker::Sync,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::Body>,
+            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
         {
             GrpcInferenceServiceClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -4236,19 +4362,25 @@ pub mod grpc_inference_service_client {
         pub async fn server_live(
             &mut self,
             request: impl tonic::IntoRequest<super::ServerLiveRequest>,
-        ) -> std::result::Result<tonic::Response<super::ServerLiveResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::ServerLiveResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/inference.GRPCInferenceService/ServerLive");
+            let path = http::uri::PathAndQuery::from_static(
+                "/inference.GRPCInferenceService/ServerLive",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "ServerLive",
-            ));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("inference.GRPCInferenceService", "ServerLive"));
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc ServerReady(ServerReadyRequest) returns
@@ -4259,19 +4391,27 @@ pub mod grpc_inference_service_client {
         pub async fn server_ready(
             &mut self,
             request: impl tonic::IntoRequest<super::ServerReadyRequest>,
-        ) -> std::result::Result<tonic::Response<super::ServerReadyResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::ServerReadyResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/inference.GRPCInferenceService/ServerReady");
+            let path = http::uri::PathAndQuery::from_static(
+                "/inference.GRPCInferenceService/ServerReady",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "ServerReady",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("inference.GRPCInferenceService", "ServerReady"),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc ModelReady(ModelReadyRequest) returns
@@ -4282,19 +4422,25 @@ pub mod grpc_inference_service_client {
         pub async fn model_ready(
             &mut self,
             request: impl tonic::IntoRequest<super::ModelReadyRequest>,
-        ) -> std::result::Result<tonic::Response<super::ModelReadyResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::ModelReadyResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/inference.GRPCInferenceService/ModelReady");
+            let path = http::uri::PathAndQuery::from_static(
+                "/inference.GRPCInferenceService/ModelReady",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "ModelReady",
-            ));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("inference.GRPCInferenceService", "ModelReady"));
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc ServerMetadata(ServerMetadataRequest) returns
@@ -4305,20 +4451,27 @@ pub mod grpc_inference_service_client {
         pub async fn server_metadata(
             &mut self,
             request: impl tonic::IntoRequest<super::ServerMetadataRequest>,
-        ) -> std::result::Result<tonic::Response<super::ServerMetadataResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::ServerMetadataResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/ServerMetadata",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "ServerMetadata",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("inference.GRPCInferenceService", "ServerMetadata"),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc ModelMetadata(ModelMetadataRequest) returns
@@ -4329,20 +4482,27 @@ pub mod grpc_inference_service_client {
         pub async fn model_metadata(
             &mut self,
             request: impl tonic::IntoRequest<super::ModelMetadataRequest>,
-        ) -> std::result::Result<tonic::Response<super::ModelMetadataResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::ModelMetadataResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/ModelMetadata",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "ModelMetadata",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("inference.GRPCInferenceService", "ModelMetadata"),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc ModelInfer(ModelInferRequest) returns
@@ -4353,19 +4513,25 @@ pub mod grpc_inference_service_client {
         pub async fn model_infer(
             &mut self,
             request: impl tonic::IntoRequest<super::ModelInferRequest>,
-        ) -> std::result::Result<tonic::Response<super::ModelInferResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::ModelInferResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/inference.GRPCInferenceService/ModelInfer");
+            let path = http::uri::PathAndQuery::from_static(
+                "/inference.GRPCInferenceService/ModelInfer",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "ModelInfer",
-            ));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("inference.GRPCInferenceService", "ModelInfer"));
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc ModelConfig(ModelConfigRequest) returns
@@ -4376,19 +4542,27 @@ pub mod grpc_inference_service_client {
         pub async fn model_config(
             &mut self,
             request: impl tonic::IntoRequest<super::ModelConfigRequest>,
-        ) -> std::result::Result<tonic::Response<super::ModelConfigResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::ModelConfigResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/inference.GRPCInferenceService/ModelConfig");
+            let path = http::uri::PathAndQuery::from_static(
+                "/inference.GRPCInferenceService/ModelConfig",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "ModelConfig",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("inference.GRPCInferenceService", "ModelConfig"),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc ModelStatistics(
@@ -4400,20 +4574,27 @@ pub mod grpc_inference_service_client {
         pub async fn model_statistics(
             &mut self,
             request: impl tonic::IntoRequest<super::ModelStatisticsRequest>,
-        ) -> std::result::Result<tonic::Response<super::ModelStatisticsResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::ModelStatisticsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/ModelStatistics",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "ModelStatistics",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("inference.GRPCInferenceService", "ModelStatistics"),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc RepositoryIndex(RepositoryIndexRequest) returns
@@ -4424,20 +4605,27 @@ pub mod grpc_inference_service_client {
         pub async fn repository_index(
             &mut self,
             request: impl tonic::IntoRequest<super::RepositoryIndexRequest>,
-        ) -> std::result::Result<tonic::Response<super::RepositoryIndexResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::RepositoryIndexResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/RepositoryIndex",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "RepositoryIndex",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("inference.GRPCInferenceService", "RepositoryIndex"),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc RepositoryModelLoad(RepositoryModelLoadRequest) returns
@@ -4448,20 +4636,30 @@ pub mod grpc_inference_service_client {
         pub async fn repository_model_load(
             &mut self,
             request: impl tonic::IntoRequest<super::RepositoryModelLoadRequest>,
-        ) -> std::result::Result<tonic::Response<super::RepositoryModelLoadResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::RepositoryModelLoadResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/RepositoryModelLoad",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "RepositoryModelLoad",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "inference.GRPCInferenceService",
+                        "RepositoryModelLoad",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
@@ -4472,20 +4670,30 @@ pub mod grpc_inference_service_client {
         pub async fn repository_model_unload(
             &mut self,
             request: impl tonic::IntoRequest<super::RepositoryModelUnloadRequest>,
-        ) -> std::result::Result<tonic::Response<super::RepositoryModelUnloadResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::RepositoryModelUnloadResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/RepositoryModelUnload",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "RepositoryModelUnload",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "inference.GRPCInferenceService",
+                        "RepositoryModelUnload",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc SystemSharedMemoryStatus(
@@ -4501,18 +4709,26 @@ pub mod grpc_inference_service_client {
             tonic::Response<super::SystemSharedMemoryStatusResponse>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/SystemSharedMemoryStatus",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "SystemSharedMemoryStatus",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "inference.GRPCInferenceService",
+                        "SystemSharedMemoryStatus",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc SystemSharedMemoryRegister(
@@ -4528,18 +4744,26 @@ pub mod grpc_inference_service_client {
             tonic::Response<super::SystemSharedMemoryRegisterResponse>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/SystemSharedMemoryRegister",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "SystemSharedMemoryRegister",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "inference.GRPCInferenceService",
+                        "SystemSharedMemoryRegister",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc SystemSharedMemoryUnregister(
@@ -4555,18 +4779,26 @@ pub mod grpc_inference_service_client {
             tonic::Response<super::SystemSharedMemoryUnregisterResponse>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/SystemSharedMemoryUnregister",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "SystemSharedMemoryUnregister",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "inference.GRPCInferenceService",
+                        "SystemSharedMemoryUnregister",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc CudaSharedMemoryStatus(
@@ -4582,18 +4814,26 @@ pub mod grpc_inference_service_client {
             tonic::Response<super::CudaSharedMemoryStatusResponse>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/CudaSharedMemoryStatus",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "CudaSharedMemoryStatus",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "inference.GRPCInferenceService",
+                        "CudaSharedMemoryStatus",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc CudaSharedMemoryRegister(
@@ -4609,18 +4849,26 @@ pub mod grpc_inference_service_client {
             tonic::Response<super::CudaSharedMemoryRegisterResponse>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/CudaSharedMemoryRegister",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "CudaSharedMemoryRegister",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "inference.GRPCInferenceService",
+                        "CudaSharedMemoryRegister",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc CudaSharedMemoryUnregister(
@@ -4636,18 +4884,26 @@ pub mod grpc_inference_service_client {
             tonic::Response<super::CudaSharedMemoryUnregisterResponse>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/CudaSharedMemoryUnregister",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "CudaSharedMemoryUnregister",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "inference.GRPCInferenceService",
+                        "CudaSharedMemoryUnregister",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc TraceSetting(TraceSettingRequest)
@@ -4658,20 +4914,27 @@ pub mod grpc_inference_service_client {
         pub async fn trace_setting(
             &mut self,
             request: impl tonic::IntoRequest<super::TraceSettingRequest>,
-        ) -> std::result::Result<tonic::Response<super::TraceSettingResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::TraceSettingResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/inference.GRPCInferenceService/TraceSetting",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "TraceSetting",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("inference.GRPCInferenceService", "TraceSetting"),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// @@  .. cpp:var:: rpc LogSettings(LogSettingsRequest)
@@ -4682,19 +4945,27 @@ pub mod grpc_inference_service_client {
         pub async fn log_settings(
             &mut self,
             request: impl tonic::IntoRequest<super::LogSettingsRequest>,
-        ) -> std::result::Result<tonic::Response<super::LogSettingsResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::LogSettingsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/inference.GRPCInferenceService/LogSettings");
+            let path = http::uri::PathAndQuery::from_static(
+                "/inference.GRPCInferenceService/LogSettings",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "inference.GRPCInferenceService",
-                "LogSettings",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("inference.GRPCInferenceService", "LogSettings"),
+                );
             self.inner.unary(req, path, codec).await
         }
     }
@@ -4706,7 +4977,7 @@ pub mod grpc_inference_service_server {
         dead_code,
         missing_docs,
         clippy::wildcard_imports,
-        clippy::let_unit_value
+        clippy::let_unit_value,
     )]
     use tonic::codegen::*;
     /// Generated trait containing gRPC methods that should be implemented for use with GrpcInferenceServiceServer.
@@ -4720,7 +4991,10 @@ pub mod grpc_inference_service_server {
         async fn server_live(
             &self,
             request: tonic::Request<super::ServerLiveRequest>,
-        ) -> std::result::Result<tonic::Response<super::ServerLiveResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::ServerLiveResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc ServerReady(ServerReadyRequest) returns
         /// @@       (ServerReadyResponse)
         /// @@
@@ -4729,7 +5003,10 @@ pub mod grpc_inference_service_server {
         async fn server_ready(
             &self,
             request: tonic::Request<super::ServerReadyRequest>,
-        ) -> std::result::Result<tonic::Response<super::ServerReadyResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::ServerReadyResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc ModelReady(ModelReadyRequest) returns
         /// @@       (ModelReadyResponse)
         /// @@
@@ -4738,7 +5015,10 @@ pub mod grpc_inference_service_server {
         async fn model_ready(
             &self,
             request: tonic::Request<super::ModelReadyRequest>,
-        ) -> std::result::Result<tonic::Response<super::ModelReadyResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::ModelReadyResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc ServerMetadata(ServerMetadataRequest) returns
         /// @@       (ServerMetadataResponse)
         /// @@
@@ -4747,7 +5027,10 @@ pub mod grpc_inference_service_server {
         async fn server_metadata(
             &self,
             request: tonic::Request<super::ServerMetadataRequest>,
-        ) -> std::result::Result<tonic::Response<super::ServerMetadataResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::ServerMetadataResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc ModelMetadata(ModelMetadataRequest) returns
         /// @@       (ModelMetadataResponse)
         /// @@
@@ -4756,7 +5039,10 @@ pub mod grpc_inference_service_server {
         async fn model_metadata(
             &self,
             request: tonic::Request<super::ModelMetadataRequest>,
-        ) -> std::result::Result<tonic::Response<super::ModelMetadataResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::ModelMetadataResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc ModelInfer(ModelInferRequest) returns
         /// @@       (ModelInferResponse)
         /// @@
@@ -4765,7 +5051,10 @@ pub mod grpc_inference_service_server {
         async fn model_infer(
             &self,
             request: tonic::Request<super::ModelInferRequest>,
-        ) -> std::result::Result<tonic::Response<super::ModelInferResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::ModelInferResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc ModelConfig(ModelConfigRequest) returns
         /// @@       (ModelConfigResponse)
         /// @@
@@ -4774,7 +5063,10 @@ pub mod grpc_inference_service_server {
         async fn model_config(
             &self,
             request: tonic::Request<super::ModelConfigRequest>,
-        ) -> std::result::Result<tonic::Response<super::ModelConfigResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::ModelConfigResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc ModelStatistics(
         /// @@                     ModelStatisticsRequest)
         /// @@                   returns (ModelStatisticsResponse)
@@ -4784,7 +5076,10 @@ pub mod grpc_inference_service_server {
         async fn model_statistics(
             &self,
             request: tonic::Request<super::ModelStatisticsRequest>,
-        ) -> std::result::Result<tonic::Response<super::ModelStatisticsResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::ModelStatisticsResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc RepositoryIndex(RepositoryIndexRequest) returns
         /// @@       (RepositoryIndexResponse)
         /// @@
@@ -4793,7 +5088,10 @@ pub mod grpc_inference_service_server {
         async fn repository_index(
             &self,
             request: tonic::Request<super::RepositoryIndexRequest>,
-        ) -> std::result::Result<tonic::Response<super::RepositoryIndexResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::RepositoryIndexResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc RepositoryModelLoad(RepositoryModelLoadRequest) returns
         /// @@       (RepositoryModelLoadResponse)
         /// @@
@@ -4802,7 +5100,10 @@ pub mod grpc_inference_service_server {
         async fn repository_model_load(
             &self,
             request: tonic::Request<super::RepositoryModelLoadRequest>,
-        ) -> std::result::Result<tonic::Response<super::RepositoryModelLoadResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::RepositoryModelLoadResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
         /// @@       returns (RepositoryModelUnloadResponse)
         /// @@
@@ -4811,7 +5112,10 @@ pub mod grpc_inference_service_server {
         async fn repository_model_unload(
             &self,
             request: tonic::Request<super::RepositoryModelUnloadRequest>,
-        ) -> std::result::Result<tonic::Response<super::RepositoryModelUnloadResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::RepositoryModelUnloadResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc SystemSharedMemoryStatus(
         /// @@                     SystemSharedMemoryStatusRequest)
         /// @@                   returns (SystemSharedMemoryStatusRespose)
@@ -4898,7 +5202,10 @@ pub mod grpc_inference_service_server {
         async fn trace_setting(
             &self,
             request: tonic::Request<super::TraceSettingRequest>,
-        ) -> std::result::Result<tonic::Response<super::TraceSettingResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::TraceSettingResponse>,
+            tonic::Status,
+        >;
         /// @@  .. cpp:var:: rpc LogSettings(LogSettingsRequest)
         /// @@                   returns (LogSettingsResponse)
         /// @@
@@ -4907,7 +5214,10 @@ pub mod grpc_inference_service_server {
         async fn log_settings(
             &self,
             request: tonic::Request<super::LogSettingsRequest>,
-        ) -> std::result::Result<tonic::Response<super::LogSettingsResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::LogSettingsResponse>,
+            tonic::Status,
+        >;
     }
     /// @@
     /// @@.. cpp:var:: service InferenceService
@@ -4935,7 +5245,10 @@ pub mod grpc_inference_service_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -4970,7 +5283,8 @@ pub mod grpc_inference_service_server {
             self
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for GrpcInferenceServiceServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>>
+    for GrpcInferenceServiceServer<T>
     where
         T: GrpcInferenceService,
         B: Body + std::marker::Send + 'static,
@@ -4990,18 +5304,23 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/ServerLive" => {
                     #[allow(non_camel_case_types)]
                     struct ServerLiveSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::ServerLiveRequest> for ServerLiveSvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::ServerLiveRequest>
+                    for ServerLiveSvc<T> {
                         type Response = super::ServerLiveResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::ServerLiveRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::server_live(&inner, request).await
+                                <T as GrpcInferenceService>::server_live(&inner, request)
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5031,19 +5350,23 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/ServerReady" => {
                     #[allow(non_camel_case_types)]
                     struct ServerReadySvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::ServerReadyRequest>
-                        for ServerReadySvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::ServerReadyRequest>
+                    for ServerReadySvc<T> {
                         type Response = super::ServerReadyResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::ServerReadyRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::server_ready(&inner, request).await
+                                <T as GrpcInferenceService>::server_ready(&inner, request)
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5073,18 +5396,23 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/ModelReady" => {
                     #[allow(non_camel_case_types)]
                     struct ModelReadySvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::ModelReadyRequest> for ModelReadySvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::ModelReadyRequest>
+                    for ModelReadySvc<T> {
                         type Response = super::ModelReadyResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::ModelReadyRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::model_ready(&inner, request).await
+                                <T as GrpcInferenceService>::model_ready(&inner, request)
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5114,19 +5442,26 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/ServerMetadata" => {
                     #[allow(non_camel_case_types)]
                     struct ServerMetadataSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::ServerMetadataRequest>
-                        for ServerMetadataSvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::ServerMetadataRequest>
+                    for ServerMetadataSvc<T> {
                         type Response = super::ServerMetadataResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::ServerMetadataRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::server_metadata(&inner, request).await
+                                <T as GrpcInferenceService>::server_metadata(
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5156,19 +5491,23 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/ModelMetadata" => {
                     #[allow(non_camel_case_types)]
                     struct ModelMetadataSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::ModelMetadataRequest>
-                        for ModelMetadataSvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::ModelMetadataRequest>
+                    for ModelMetadataSvc<T> {
                         type Response = super::ModelMetadataResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::ModelMetadataRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::model_metadata(&inner, request).await
+                                <T as GrpcInferenceService>::model_metadata(&inner, request)
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5198,18 +5537,23 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/ModelInfer" => {
                     #[allow(non_camel_case_types)]
                     struct ModelInferSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::ModelInferRequest> for ModelInferSvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::ModelInferRequest>
+                    for ModelInferSvc<T> {
                         type Response = super::ModelInferResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::ModelInferRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::model_infer(&inner, request).await
+                                <T as GrpcInferenceService>::model_infer(&inner, request)
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5239,19 +5583,23 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/ModelConfig" => {
                     #[allow(non_camel_case_types)]
                     struct ModelConfigSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::ModelConfigRequest>
-                        for ModelConfigSvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::ModelConfigRequest>
+                    for ModelConfigSvc<T> {
                         type Response = super::ModelConfigResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::ModelConfigRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::model_config(&inner, request).await
+                                <T as GrpcInferenceService>::model_config(&inner, request)
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5281,19 +5629,26 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/ModelStatistics" => {
                     #[allow(non_camel_case_types)]
                     struct ModelStatisticsSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::ModelStatisticsRequest>
-                        for ModelStatisticsSvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::ModelStatisticsRequest>
+                    for ModelStatisticsSvc<T> {
                         type Response = super::ModelStatisticsResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::ModelStatisticsRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::model_statistics(&inner, request).await
+                                <T as GrpcInferenceService>::model_statistics(
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5323,19 +5678,26 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/RepositoryIndex" => {
                     #[allow(non_camel_case_types)]
                     struct RepositoryIndexSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::RepositoryIndexRequest>
-                        for RepositoryIndexSvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::RepositoryIndexRequest>
+                    for RepositoryIndexSvc<T> {
                         type Response = super::RepositoryIndexResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::RepositoryIndexRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::repository_index(&inner, request).await
+                                <T as GrpcInferenceService>::repository_index(
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5365,19 +5727,25 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/RepositoryModelLoad" => {
                     #[allow(non_camel_case_types)]
                     struct RepositoryModelLoadSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::RepositoryModelLoadRequest>
-                        for RepositoryModelLoadSvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::RepositoryModelLoadRequest>
+                    for RepositoryModelLoadSvc<T> {
                         type Response = super::RepositoryModelLoadResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::RepositoryModelLoadRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::repository_model_load(&inner, request)
+                                <T as GrpcInferenceService>::repository_model_load(
+                                        &inner,
+                                        request,
+                                    )
                                     .await
                             };
                             Box::pin(fut)
@@ -5408,12 +5776,15 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/RepositoryModelUnload" => {
                     #[allow(non_camel_case_types)]
                     struct RepositoryModelUnloadSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::RepositoryModelUnloadRequest>
-                        for RepositoryModelUnloadSvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::RepositoryModelUnloadRequest>
+                    for RepositoryModelUnloadSvc<T> {
                         type Response = super::RepositoryModelUnloadResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::RepositoryModelUnloadRequest>,
@@ -5421,9 +5792,10 @@ pub mod grpc_inference_service_server {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as GrpcInferenceService>::repository_model_unload(
-                                    &inner, request,
-                                )
-                                .await
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5452,23 +5824,31 @@ pub mod grpc_inference_service_server {
                 }
                 "/inference.GRPCInferenceService/SystemSharedMemoryStatus" => {
                     #[allow(non_camel_case_types)]
-                    struct SystemSharedMemoryStatusSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::SystemSharedMemoryStatusRequest>
-                        for SystemSharedMemoryStatusSvc<T>
-                    {
+                    struct SystemSharedMemoryStatusSvc<T: GrpcInferenceService>(
+                        pub Arc<T>,
+                    );
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::SystemSharedMemoryStatusRequest>
+                    for SystemSharedMemoryStatusSvc<T> {
                         type Response = super::SystemSharedMemoryStatusResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::SystemSharedMemoryStatusRequest>,
+                            request: tonic::Request<
+                                super::SystemSharedMemoryStatusRequest,
+                            >,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as GrpcInferenceService>::system_shared_memory_status(
-                                    &inner, request,
-                                )
-                                .await
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5497,23 +5877,32 @@ pub mod grpc_inference_service_server {
                 }
                 "/inference.GRPCInferenceService/SystemSharedMemoryRegister" => {
                     #[allow(non_camel_case_types)]
-                    struct SystemSharedMemoryRegisterSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::SystemSharedMemoryRegisterRequest>
-                        for SystemSharedMemoryRegisterSvc<T>
-                    {
+                    struct SystemSharedMemoryRegisterSvc<T: GrpcInferenceService>(
+                        pub Arc<T>,
+                    );
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<
+                        super::SystemSharedMemoryRegisterRequest,
+                    > for SystemSharedMemoryRegisterSvc<T> {
                         type Response = super::SystemSharedMemoryRegisterResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::SystemSharedMemoryRegisterRequest>,
+                            request: tonic::Request<
+                                super::SystemSharedMemoryRegisterRequest,
+                            >,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as GrpcInferenceService>::system_shared_memory_register(
-                                    &inner, request,
-                                )
-                                .await
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5542,23 +5931,32 @@ pub mod grpc_inference_service_server {
                 }
                 "/inference.GRPCInferenceService/SystemSharedMemoryUnregister" => {
                     #[allow(non_camel_case_types)]
-                    struct SystemSharedMemoryUnregisterSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::SystemSharedMemoryUnregisterRequest>
-                        for SystemSharedMemoryUnregisterSvc<T>
-                    {
+                    struct SystemSharedMemoryUnregisterSvc<T: GrpcInferenceService>(
+                        pub Arc<T>,
+                    );
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<
+                        super::SystemSharedMemoryUnregisterRequest,
+                    > for SystemSharedMemoryUnregisterSvc<T> {
                         type Response = super::SystemSharedMemoryUnregisterResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::SystemSharedMemoryUnregisterRequest>,
+                            request: tonic::Request<
+                                super::SystemSharedMemoryUnregisterRequest,
+                            >,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as GrpcInferenceService>::system_shared_memory_unregister(
-                                    &inner, request,
-                                )
-                                .await
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5587,13 +5985,18 @@ pub mod grpc_inference_service_server {
                 }
                 "/inference.GRPCInferenceService/CudaSharedMemoryStatus" => {
                     #[allow(non_camel_case_types)]
-                    struct CudaSharedMemoryStatusSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::CudaSharedMemoryStatusRequest>
-                        for CudaSharedMemoryStatusSvc<T>
-                    {
+                    struct CudaSharedMemoryStatusSvc<T: GrpcInferenceService>(
+                        pub Arc<T>,
+                    );
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::CudaSharedMemoryStatusRequest>
+                    for CudaSharedMemoryStatusSvc<T> {
                         type Response = super::CudaSharedMemoryStatusResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::CudaSharedMemoryStatusRequest>,
@@ -5601,9 +6004,10 @@ pub mod grpc_inference_service_server {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as GrpcInferenceService>::cuda_shared_memory_status(
-                                    &inner, request,
-                                )
-                                .await
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5632,23 +6036,31 @@ pub mod grpc_inference_service_server {
                 }
                 "/inference.GRPCInferenceService/CudaSharedMemoryRegister" => {
                     #[allow(non_camel_case_types)]
-                    struct CudaSharedMemoryRegisterSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::CudaSharedMemoryRegisterRequest>
-                        for CudaSharedMemoryRegisterSvc<T>
-                    {
+                    struct CudaSharedMemoryRegisterSvc<T: GrpcInferenceService>(
+                        pub Arc<T>,
+                    );
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::CudaSharedMemoryRegisterRequest>
+                    for CudaSharedMemoryRegisterSvc<T> {
                         type Response = super::CudaSharedMemoryRegisterResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::CudaSharedMemoryRegisterRequest>,
+                            request: tonic::Request<
+                                super::CudaSharedMemoryRegisterRequest,
+                            >,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as GrpcInferenceService>::cuda_shared_memory_register(
-                                    &inner, request,
-                                )
-                                .await
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5677,23 +6089,32 @@ pub mod grpc_inference_service_server {
                 }
                 "/inference.GRPCInferenceService/CudaSharedMemoryUnregister" => {
                     #[allow(non_camel_case_types)]
-                    struct CudaSharedMemoryUnregisterSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::CudaSharedMemoryUnregisterRequest>
-                        for CudaSharedMemoryUnregisterSvc<T>
-                    {
+                    struct CudaSharedMemoryUnregisterSvc<T: GrpcInferenceService>(
+                        pub Arc<T>,
+                    );
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<
+                        super::CudaSharedMemoryUnregisterRequest,
+                    > for CudaSharedMemoryUnregisterSvc<T> {
                         type Response = super::CudaSharedMemoryUnregisterResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::CudaSharedMemoryUnregisterRequest>,
+                            request: tonic::Request<
+                                super::CudaSharedMemoryUnregisterRequest,
+                            >,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as GrpcInferenceService>::cuda_shared_memory_unregister(
-                                    &inner, request,
-                                )
-                                .await
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5723,19 +6144,23 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/TraceSetting" => {
                     #[allow(non_camel_case_types)]
                     struct TraceSettingSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::TraceSettingRequest>
-                        for TraceSettingSvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::TraceSettingRequest>
+                    for TraceSettingSvc<T> {
                         type Response = super::TraceSettingResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::TraceSettingRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::trace_setting(&inner, request).await
+                                <T as GrpcInferenceService>::trace_setting(&inner, request)
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5765,19 +6190,23 @@ pub mod grpc_inference_service_server {
                 "/inference.GRPCInferenceService/LogSettings" => {
                     #[allow(non_camel_case_types)]
                     struct LogSettingsSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<T: GrpcInferenceService>
-                        tonic::server::UnaryService<super::LogSettingsRequest>
-                        for LogSettingsSvc<T>
-                    {
+                    impl<
+                        T: GrpcInferenceService,
+                    > tonic::server::UnaryService<super::LogSettingsRequest>
+                    for LogSettingsSvc<T> {
                         type Response = super::LogSettingsResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::LogSettingsRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as GrpcInferenceService>::log_settings(&inner, request).await
+                                <T as GrpcInferenceService>::log_settings(&inner, request)
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -5804,19 +6233,25 @@ pub mod grpc_inference_service_server {
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    let mut response = http::Response::new(tonic::body::Body::default());
-                    let headers = response.headers_mut();
-                    headers.insert(
-                        tonic::Status::GRPC_STATUS,
-                        (tonic::Code::Unimplemented as i32).into(),
-                    );
-                    headers.insert(
-                        http::header::CONTENT_TYPE,
-                        tonic::metadata::GRPC_CONTENT_TYPE,
-                    );
-                    Ok(response)
-                }),
+                _ => {
+                    Box::pin(async move {
+                        let mut response = http::Response::new(
+                            tonic::body::Body::default(),
+                        );
+                        let headers = response.headers_mut();
+                        headers
+                            .insert(
+                                tonic::Status::GRPC_STATUS,
+                                (tonic::Code::Unimplemented as i32).into(),
+                            );
+                        headers
+                            .insert(
+                                http::header::CONTENT_TYPE,
+                                tonic::metadata::GRPC_CONTENT_TYPE,
+                            );
+                        Ok(response)
+                    })
+                }
             }
         }
     }

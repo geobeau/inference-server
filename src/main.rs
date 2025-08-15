@@ -4,7 +4,7 @@ mod loader;
 mod scheduler;
 mod tensor;
 mod tracing;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tonic::transport::Server;
 
 use ort::{
@@ -27,7 +27,7 @@ use crate::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // console_subscriber::init();
+    console_subscriber::init();
     let addr = "0.0.0.0:8001".parse()?; // Triton default gRPC port is 8001
                                         // Initialize our service with S3 connection details
 
@@ -38,9 +38,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut model_config: Option<ModelConfig> = None;
     let mut model_metadata: Option<ModelMetadata> = None;
 
-    let batch_size = 64;
-    for _ in 0..1 {
-        let (tx, rx) = flume::bounded(1);
+    let batch_size = 16;
+    for i in 0..1 {
+        let (tx, rx) = flume::bounded(batch_size as usize);
         let vino_provider = OpenVINOExecutionProvider::default()
             .with_device_type("CPU")
             .build();
@@ -51,8 +51,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .with_execution_providers([vino_provider])
             .unwrap()
-            .with_intra_threads(1)
+            .with_intra_threads(4)
             .unwrap()
+            .with_log_level(ort::logging::LogLevel::Verbose).unwrap()
             .commit_from_file("samples/int64_to_float64.onnx")
             // .commit_from_file("samples/matmul.onnx")
             .unwrap();
@@ -197,7 +198,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let mut executor = loader::OnnxExecutor {
+            id: format!("executor-{i}"),
             session,
+            batch_size: batch_size as usize,
             inputs: rx,
         };
         tokio::spawn(async move {
@@ -211,6 +214,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut sched = scheduler::Scheduler {
         inputs: input_rx,
         executors: executor_endpoints,
+        max_queue_time: Duration::from_millis(2),
+        batch_size,
     };
 
     let model_proxy = scheduler::ModelProxy {

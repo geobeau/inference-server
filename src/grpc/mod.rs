@@ -167,9 +167,12 @@ impl GrpcInferenceService for TritonService {
             resp_chan: sender,
             trace,
         };
+
+        // println!("dispatch");
         proxy.request_sender.send_async(req).await.unwrap();
         let mut resp = receiver.recv_async().await.unwrap();
 
+        // println!("resp");
         let mut raw_output: Vec<Vec<u8>> = Vec::new();
 
         let outputs = resp
@@ -185,8 +188,6 @@ impl GrpcInferenceService for TritonService {
                     .collect();
                 raw_output.push(bytes);
 
-                println!("output tensor {:?}", serial_data);
-
                 InferOutputTensor {
                     name: String::from(key),
                     datatype: DataType::from(*data_type).as_str_name().to_string(),
@@ -198,7 +199,7 @@ impl GrpcInferenceService for TritonService {
             .collect();
 
         resp.trace.record_process_response();
-        println!("{:?}", resp.trace);
+        // println!("{:?}", resp.trace);
 
         Ok(Response::new(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),
