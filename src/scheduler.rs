@@ -68,7 +68,8 @@ impl Scheduler {
                 queue_timeout = Duration::from_micros(max(self.max_queue_time.as_micros() as i128 - oldest_record.elapsed().as_micros() as i128, 0i128) as u64);
             }
             
-            let maybe_request = timeout(queue_timeout, self.inputs.stream().next()).await;
+            // let maybe_request = timeout(queue_timeout, self.inputs.stream().next()).await;
+            let maybe_request: Result<Option<InferenceRequest>,  tokio::time::error::Elapsed> = Ok(self.inputs.stream().next().await);
             match maybe_request {
                 Ok(req) => {
                     match req {

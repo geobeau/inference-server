@@ -3,6 +3,7 @@ pub mod inference;
 
 use std::ops::Deref;
 use std::sync::Arc;
+use std::time::Duration;
 use std::{collections::HashMap, vec};
 
 use inference::grpc_inference_service_server::GrpcInferenceService; // Trait
@@ -121,7 +122,7 @@ impl GrpcInferenceService for TritonService {
             // Force the lock to be dropped
             proxy = match self
                 .loaded_models
-                .write()
+                .read()
                 .await
                 .get(&request_ref.model_name)
             {
@@ -199,7 +200,10 @@ impl GrpcInferenceService for TritonService {
             .collect();
 
         resp.trace.record_process_response();
-        // println!("{:?}", resp.trace);
+
+        if resp.trace.elapsed() > Duration::from_millis(2) {
+            println!("{:?}", resp.trace);
+        }
 
         Ok(Response::new(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),

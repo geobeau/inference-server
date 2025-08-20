@@ -37,7 +37,7 @@ impl OnnxExecutor {
                     }
                     Request::InferenceRequest(mut req) => {
                         // println!("batching: {}", batched_requests_chan.len());
-                        req.trace.record_executor_start();
+                        req.trace.record_executor_queue();
                         input_batch.append_inputs(req.inputs);
                         batched_requests_chan.push(req.resp_chan);
                         batched_requests_trace.push(req.trace);
@@ -51,6 +51,7 @@ impl OnnxExecutor {
                 }
                 
             }
+            batched_requests_trace.iter_mut().for_each(|trace| trace.record_executor_start());
             // println!("{} batch: {}", self.id, batched_requests_chan.len());
             let session_outputs = self.session.run(input_batch.session_inputs_view()).unwrap();
 

@@ -214,7 +214,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut sched = scheduler::Scheduler {
         inputs: input_rx,
         executors: executor_endpoints,
-        max_queue_time: Duration::from_millis(2),
+        max_queue_time: Duration::from_millis(1),
         batch_size,
     };
 
