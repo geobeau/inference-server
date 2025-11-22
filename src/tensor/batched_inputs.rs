@@ -26,10 +26,12 @@ pub enum AppendError {
     NoBufferReady,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BatchState {
     Writtable,
     Written,
-    Consumed,
+    Executed,
+    ReadyToUse,
 }
 
 pub struct TensorBatch {
@@ -114,11 +116,21 @@ impl TensorBatch {
         }
 
         notifier.await;
-        Some(self.get_output(slot))
+        let output = self.get_output(slot);
+
+        let slot_written = self.written_slots.fetch_sub(1, Ordering::Release);
+        if slot_written - 1 == self.batch_size {
+            self.reset();
+            self.state.replace(BatchState::ReadyToUse);
+        }
+        return Some(output)
     }
 
-    pub fn get_output(&self, _slot: usize) -> HashMap<String, DynTensor> {
-        HashMap::new()
+    pub fn get_output(&self, slot: usize) -> HashMap<String, DynTensor> {
+        unsafe {
+            let data = (*self.output_data.get()).as_ref().unwrap();
+            return data.pop_outputs(slot);
+        }
     }
 
     pub fn append(&self, data: &HashMap<String, DynTensor>) -> Option<usize> {
@@ -158,6 +170,9 @@ impl TensorBatch {
             let ptr = self.output_data.get();
             *ptr = Some(f(input));
         }
+        self.state.replace(BatchState::Executed);
+        fence(Ordering::Release);
+        self.notifier.notify_waiters();
     }
 
     pub fn get_data_view(&self) -> Option<HashMap<String, ValueRef<'_, DynTensorValueType>>> {
@@ -190,6 +205,10 @@ impl TensorBatch {
     pub fn reset(&self) {
         self.reserved_slots.store(0, Ordering::Release);
         self.written_slots.store(0, Ordering::Release);
+    }
+
+    pub fn is_ready_to_use(&self) -> bool {
+        *self.state.borrow() == BatchState::ReadyToUse
     }
 }
 

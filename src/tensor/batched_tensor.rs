@@ -5,7 +5,6 @@ pub struct BatchableTensor {
 
 pub struct BatchedTensor {
     pub inner_tensor: DynValue,
-    pub offset: usize,
     pub data_type: TensorElementType,
     tensor_shape: Shape,
 }
@@ -20,10 +19,11 @@ macro_rules! copy_tensor_slice {
 }
 
 macro_rules! pop_tensor_slice {
-    ($ty:ty, $inner:expr, $new_tensor:expr, $offset:expr, $new_offset:expr) => {{
-        let (_, data) = $new_tensor.try_extract_tensor_mut::<$ty>().unwrap();
+    ($ty:ty, $inner:expr, $new_tensor:expr, $offset:expr) => {{
+        let (new_shape, data) = $new_tensor.try_extract_tensor_mut::<$ty>().unwrap();
         let (_, inner_data) = $inner.try_extract_tensor::<$ty>().unwrap();
-        data.copy_from_slice(&inner_data[$new_offset..$offset]);
+        let tensor_size = new_shape.num_elements();
+        data.copy_from_slice(&inner_data[$offset * tensor_size..($offset+1) * tensor_size]);
     }};
 }
 
@@ -78,11 +78,11 @@ impl BatchedOutputs {
         }
     }
 
-    pub fn pop_outputs(&mut self) -> HashMap<String, DynTensor> {
+    pub fn pop_outputs(&self, slot: usize) -> HashMap<String, DynTensor> {
         let mut outputs = HashMap::new();
 
-        self.outputs.iter_mut().for_each(|(name, batch_tensor)| {
-            outputs.insert(name.clone(), batch_tensor.pop());
+        self.outputs.iter().for_each(|(name, batch_tensor)| {
+            outputs.insert(name.clone(), batch_tensor.pop_at(slot));
         });
         outputs
     }
@@ -91,19 +91,16 @@ impl BatchedOutputs {
 impl BatchedTensor {
     fn from(dyn_value: DynValue) -> BatchedTensor {
         let mut shape = dyn_value.shape().clone();
-        let offset = shape.num_elements();
         // the shape of each sub tensor
         shape[0] = 1;
         BatchedTensor {
             data_type: *dyn_value.data_type(),
             tensor_shape: shape,
             inner_tensor: dyn_value,
-            offset,
         }
     }
 
-    fn pop(&mut self) -> DynTensor {
-        let new_offset = self.offset - self.tensor_shape.num_elements();
+    fn pop_at(&self, slot: usize) -> DynTensor {
         let mut tensor = DynTensor::new(
             &Allocator::default(),
             self.data_type,
@@ -112,37 +109,37 @@ impl BatchedTensor {
         .unwrap();
         match self.data_type {
             TensorElementType::Float32 => {
-                pop_tensor_slice!(f32, self.inner_tensor, tensor, self.offset, new_offset)
+                pop_tensor_slice!(f32, self.inner_tensor, tensor, slot)
             }
             TensorElementType::Uint8 => {
-                pop_tensor_slice!(u8, self.inner_tensor, tensor, self.offset, new_offset)
+                pop_tensor_slice!(u8, self.inner_tensor, tensor, slot)
             }
             TensorElementType::Int8 => {
-                pop_tensor_slice!(i8, self.inner_tensor, tensor, self.offset, new_offset)
+                pop_tensor_slice!(i8, self.inner_tensor, tensor, slot)
             }
             TensorElementType::Uint16 => {
-                pop_tensor_slice!(u16, self.inner_tensor, tensor, self.offset, new_offset)
+                pop_tensor_slice!(u16, self.inner_tensor, tensor, slot)
             }
             TensorElementType::Int16 => {
-                pop_tensor_slice!(i16, self.inner_tensor, tensor, self.offset, new_offset)
+                pop_tensor_slice!(i16, self.inner_tensor, tensor, slot)
             }
             TensorElementType::Int32 => {
-                pop_tensor_slice!(i32, self.inner_tensor, tensor, self.offset, new_offset)
+                pop_tensor_slice!(i32, self.inner_tensor, tensor, slot)
             }
             TensorElementType::Int64 => {
-                pop_tensor_slice!(i64, self.inner_tensor, tensor, self.offset, new_offset)
+                pop_tensor_slice!(i64, self.inner_tensor, tensor, slot)
             }
             TensorElementType::Bool => {
-                pop_tensor_slice!(bool, self.inner_tensor, tensor, self.offset, new_offset)
+                pop_tensor_slice!(bool, self.inner_tensor, tensor, slot)
             }
             TensorElementType::Float64 => {
-                pop_tensor_slice!(f64, self.inner_tensor, tensor, self.offset, new_offset)
+                pop_tensor_slice!(f64, self.inner_tensor, tensor, slot)
             }
             TensorElementType::Uint32 => {
-                pop_tensor_slice!(u32, self.inner_tensor, tensor, self.offset, new_offset)
+                pop_tensor_slice!(u32, self.inner_tensor, tensor, slot)
             }
             TensorElementType::Uint64 => {
-                pop_tensor_slice!(u64, self.inner_tensor, tensor, self.offset, new_offset)
+                pop_tensor_slice!(u64, self.inner_tensor, tensor, slot)
             }
 
             // Unsupported or special handling types
@@ -159,7 +156,6 @@ impl BatchedTensor {
             TensorElementType::String => todo!(),
             TensorElementType::Undefined => todo!(),
         };
-        self.offset = new_offset;
         tensor
     }
 }

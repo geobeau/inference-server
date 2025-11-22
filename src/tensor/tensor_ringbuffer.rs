@@ -7,6 +7,7 @@ use ort::{
     session::Input,
     value::{DynTensor, DynTensorValueType, ValueRef},
 };
+use prost::bytes::buf;
 use tokio::sync::Notify;
 
 use crate::tensor::{
@@ -67,6 +68,27 @@ impl BatchRingBuffer {
         }
     }
 
+    fn update_tail_to_next_in_use(&self) {
+        loop {
+            let tail = self.tail.load(Ordering::Acquire);
+            if self.buffer[tail].is_ready_to_use() {
+                match self.head.compare_exchange_weak(
+                    tail,
+                    (tail+1) & self.mask,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    Ok(_) => continue,
+                    Err(_) => continue,
+                }
+            } else {
+                // All ready have been put back in the queue
+                return;
+            }
+        }
+
+    }
+
     /// Append data to the current buffer, moving to next if full
     pub async fn infer(
         &self,
@@ -84,7 +106,12 @@ impl BatchRingBuffer {
 
             // Try to append to current buffer
             match buffer.infer(data).await {
-                Some(output) => return Ok(output),
+                Some(output) => {
+                    if buffer.is_ready_to_use() {
+                        self.update_tail_to_next_in_use();
+                    }
+                    return Ok(output)
+                },
                 None => {
                     // Buffer is full, try to move to next
                     let tail = self.tail.load(Ordering::Acquire);
