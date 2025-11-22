@@ -3,27 +3,26 @@ pub mod inference;
 
 use std::ops::Deref;
 use std::sync::Arc;
-use std::time::Duration;
 use std::{collections::HashMap, vec};
 
+use arc_swap::ArcSwap;
 use inference::grpc_inference_service_server::GrpcInferenceService; // Trait
 use inference::*;
-use tokio::sync::RwLock;
 use tonic::{Request, Response, Status};
 
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
-use crate::scheduler::{InferenceRequest, ModelProxy};
-use crate::tensor::dyntensor_from_bytes;
+use crate::scheduler::ModelProxy;
+use crate::tensor::batched_tensor::dyntensor_from_bytes;
 use crate::tracing::Trace;
 
 #[derive(Clone)]
 pub struct TritonService {
     /// Set of model names that are currently considered "loaded"
-    pub loaded_models: Arc<RwLock<HashMap<String, ModelProxy>>>,
+    pub loaded_models: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
 }
 
 impl TritonService {
-    pub fn new(model_map: Arc<RwLock<HashMap<String, ModelProxy>>>) -> Self {
+    pub fn new(model_map: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>) -> Self {
         TritonService {
             loaded_models: model_map,
         }
@@ -81,7 +80,7 @@ impl GrpcInferenceService for TritonService {
     ) -> Result<Response<ModelMetadataResponse>, Status> {
         let model_name = &request.get_ref().name;
         println!("Getting model config for {model_name}");
-        match self.loaded_models.read().await.get(model_name) {
+        match self.loaded_models.load().get(model_name) {
             Some(proxy) => Ok(Response::new(ModelMetadataResponse {
                 name: model_name.clone(),
                 versions: vec![String::from("1")],
@@ -93,23 +92,6 @@ impl GrpcInferenceService for TritonService {
         }
     }
 
-    // let mut rng = rand::rng();
-    // let input_a = ndarray::Array2::<f32>::from_shape_fn((1024, 1024), |_| rng.random::<f32>());
-    // let input_b = ndarray::Array2::<f32>::from_shape_fn((1024, 1024), |_| rng.random::<f32>());
-
-    // let data1 = Tensor::from_array(input_a).unwrap().upcast();
-    // let data2 = Tensor::from_array(input_b).unwrap().upcast();
-
-    // let mut data: HashMap<String, DynTensor> = HashMap::with_capacity(2);
-
-    // data.insert(String::from("A"), data1);
-    // data.insert(String::from("B"), data2);
-
-    // match input_tx.send(data) {
-    //     Ok(_) => println!("success"),
-    //     Err(x) => println!("Error {}", x),
-    // }
-
     async fn model_infer(
         &self,
         request: Request<ModelInferRequest>,
@@ -117,26 +99,19 @@ impl GrpcInferenceService for TritonService {
         let request_ref = request.get_ref();
         let mut trace = Trace::start();
 
-        let proxy: ModelProxy;
-        {
-            // Force the lock to be dropped
-            proxy = match self
-                .loaded_models
-                .read()
-                .await
-                .get(&request_ref.model_name)
-            {
-                Some(proxy) => proxy.clone(),
-                None => {
-                    return Err(Status::not_found(format!(
-                        "Model {} not found",
-                        &request_ref.model_name
-                    )))
-                }
-            };
-        }
+        let models = self.loaded_models.load();
 
-        let (sender, receiver) = flume::bounded(1);
+        // Force the lock to be dropped
+        let proxy: &ModelProxy = match models.get(&request_ref.model_name) {
+            Some(proxy) => proxy,
+            None => {
+                return Err(Status::not_found(format!(
+                    "Model {} not found",
+                    &request_ref.model_name
+                )))
+            }
+        };
+
         let mut inputs = HashMap::new();
 
         trace.record_serialization_start();
@@ -163,21 +138,11 @@ impl GrpcInferenceService for TritonService {
             });
 
         trace.record_dispatch();
-        let req = InferenceRequest {
-            inputs,
-            resp_chan: sender,
-            trace,
-        };
-
-        // println!("dispatch");
-        proxy.request_sender.send_async(req).await.unwrap();
-        let mut resp = receiver.recv_async().await.unwrap();
-
+        let inference_outputs = proxy.data.infer(&inputs).await.unwrap();
         // println!("resp");
         let mut raw_output: Vec<Vec<u8>> = Vec::new();
 
-        let outputs = resp
-            .outputs
+        let outputs = inference_outputs
             .iter()
             .map(|(key, output)| {
                 let data_type = output.data_type();
@@ -199,12 +164,6 @@ impl GrpcInferenceService for TritonService {
             })
             .collect();
 
-        resp.trace.record_process_response();
-
-        if resp.trace.elapsed() > Duration::from_millis(2) {
-            println!("{:?}", resp.trace);
-        }
-
         Ok(Response::new(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),
             model_version: String::from("1"),
@@ -221,7 +180,7 @@ impl GrpcInferenceService for TritonService {
     ) -> Result<Response<ModelConfigResponse>, Status> {
         let model_name = &request.get_ref().name;
         println!("Getting model config for {model_name}");
-        match self.loaded_models.read().await.get(model_name) {
+        match self.loaded_models.load().get(model_name) {
             Some(proxy) => Ok(Response::new(ModelConfigResponse {
                 config: Some(proxy.model_config.clone()),
             })),

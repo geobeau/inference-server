@@ -29,7 +29,7 @@ impl Trace {
         }
     }
     pub fn elapsed(&self) -> Duration {
-        return self.start.elapsed()
+        self.start.elapsed()
     }
 
     pub fn record_serialization_start(&mut self) {

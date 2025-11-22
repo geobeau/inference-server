@@ -1,17 +1,16 @@
-#![feature(array_chunks)]
 mod grpc;
 mod loader;
 mod scheduler;
 mod tensor;
 mod tracing;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use arc_swap::ArcSwap;
+use std::{collections::HashMap, sync::Arc};
 use tonic::transport::Server;
 
 use ort::{
     execution_providers::{CPUExecutionProvider, OpenVINOExecutionProvider},
     session::{builder::GraphOptimizationLevel, Session},
 };
-use tokio::sync::RwLock;
 
 use crate::{
     grpc::{
@@ -23,6 +22,7 @@ use crate::{
         TritonService,
     },
     scheduler::ModelMetadata,
+    tensor::tensor_ringbuffer::BatchRingBuffer,
 };
 
 #[tokio::main]
@@ -31,16 +31,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:8001".parse()?; // Triton default gRPC port is 8001
                                         // Initialize our service with S3 connection details
 
-    let (input_tx, input_rx) = flume::bounded(4096);
-
-    let mut executor_endpoints = Vec::new();
-
     let mut model_config: Option<ModelConfig> = None;
     let mut model_metadata: Option<ModelMetadata> = None;
 
+    let mut ring_buffer: Option<BatchRingBuffer> = None;
+    let mut model_proxy: Option<Arc<scheduler::ModelProxy>> = None;
+
     let batch_size = 16;
     for i in 0..1 {
-        let (tx, rx) = flume::bounded(batch_size as usize);
         let vino_provider = OpenVINOExecutionProvider::default()
             .with_device_type("CPU")
             .build();
@@ -53,13 +51,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .with_intra_threads(4)
             .unwrap()
-            .with_log_level(ort::logging::LogLevel::Verbose).unwrap()
+            .with_log_level(ort::logging::LogLevel::Verbose)
+            .unwrap()
             .commit_from_file("samples/int64_to_float64.onnx")
             // .commit_from_file("samples/matmul.onnx")
             .unwrap();
 
-        {
+        if i == 0 {
             let metadata = session.metadata().unwrap();
+            let inputs = session.inputs.iter().collect();
+            ring_buffer = Some(BatchRingBuffer::new(2, batch_size as usize, &inputs));
 
             let inputs = session
                 .inputs
@@ -195,42 +196,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 model_metrics: None,
                 scheduling_choice: None,
             });
+
+            model_proxy = Some(Arc::from(scheduler::ModelProxy {
+                data: ring_buffer.unwrap(),
+                model_config: model_config.unwrap(),
+                model_metadata: model_metadata.unwrap(),
+            }));
         }
 
         let mut executor = loader::OnnxExecutor {
             id: format!("executor-{i}"),
             session,
-            batch_size: batch_size as usize,
-            inputs: rx,
+            model: model_proxy.clone().unwrap(),
         };
         tokio::spawn(async move {
             executor.run().await;
         });
-
-        let endpoint = scheduler::ExecutorEndpoint { sender: tx };
-        executor_endpoints.push(endpoint);
     }
 
-    let mut sched = scheduler::Scheduler {
-        inputs: input_rx,
-        executors: executor_endpoints,
-        max_queue_time: Duration::from_millis(1),
-        batch_size,
-    };
-
-    let model_proxy = scheduler::ModelProxy {
-        request_sender: input_tx,
-        model_config: model_config.unwrap(),
-        model_metadata: model_metadata.unwrap(),
-    };
-
     let mut model_map = HashMap::new();
-    model_map.insert(String::from("Int64ToFloat64Model"), model_proxy);
-    let service = TritonService::new(Arc::from(RwLock::from(model_map)));
-
-    tokio::spawn(async move {
-        sched.run().await;
-    });
+    model_map.insert(
+        String::from("Int64ToFloat64Model"),
+        model_proxy.clone().unwrap(),
+    );
+    let service = TritonService::new(Arc::from(ArcSwap::from_pointee(model_map)));
 
     println!("Starting Triton gRPC server on {}", addr);
     let svc = GrpcInferenceServiceServer::new(service).max_decoding_message_size(128 * 1024 * 1024);
