@@ -3,6 +3,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+use log::debug;
 use ort::{
     session::Input,
     value::{DynTensor, DynTensorValueType, ValueRef},
@@ -75,6 +76,11 @@ impl BatchRingBuffer {
     fn update_tail_to_next_in_use(&self) {
         loop {
             let tail = self.tail.load(Ordering::Acquire);
+            let head = self.head.load(Ordering::Acquire);
+            if tail == head {
+                println!("All buffer put back in queue");
+                return;
+            }
             if self.buffer[tail].is_ready_to_use() {
                 println!("{} {} {}", tail, (tail+1), (tail+1) & self.mask);
                 match self.tail.compare_exchange_weak(
@@ -91,7 +97,7 @@ impl BatchRingBuffer {
                 }
             } else {
                 // All ready have been put back in the queue
-                println!("Putting back buffer in the queue");
+                println!("All ready buffers put back in queue");
                 self.infer_full_notifier.notify_waiters();
                 return;
             }

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use ort::session::Session;
+use log::{debug, info};
+use ort::{ session::Session};
 
 use crate::{scheduler::ModelProxy, tensor::batched_tensor::BatchedOutputs};
 

@@ -8,6 +8,7 @@ use std::{collections::HashMap, vec};
 use arc_swap::ArcSwap;
 use inference::grpc_inference_service_server::GrpcInferenceService; // Trait
 use inference::*;
+use log::debug;
 use tonic::{Request, Response, Status};
 
 use crate::grpc::inference::model_infer_response::InferOutputTensor;

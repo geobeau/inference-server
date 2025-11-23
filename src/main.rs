@@ -4,6 +4,7 @@ mod scheduler;
 mod tensor;
 mod tracing;
 use arc_swap::ArcSwap;
+use log::info;
 use std::{collections::HashMap, sync::Arc};
 use tonic::transport::Server;
 
@@ -38,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut model_proxy: Option<Arc<scheduler::ModelProxy>> = None;
 
     let batch_size = 16;
-    for i in 0..1 {
+    for i in 0..2 {
         let vino_provider = OpenVINOExecutionProvider::default()
             .with_device_type("CPU")
             .build();
@@ -60,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if i == 0 {
             let metadata = session.metadata().unwrap();
             let inputs = session.inputs.iter().collect();
-            ring_buffer = Some(BatchRingBuffer::new(2, batch_size as usize, &inputs));
+            ring_buffer = Some(BatchRingBuffer::new(8, batch_size as usize, &inputs));
 
             let inputs = session
                 .inputs
@@ -226,7 +227,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let service = TritonService::new(Arc::from(ArcSwap::from_pointee(model_map)));
 
-    println!("Starting Triton gRPC server on {}", addr);
+    info!("Starting Triton gRPC server on {}", addr);
     let svc = GrpcInferenceServiceServer::new(service).max_decoding_message_size(128 * 1024 * 1024);
     Server::builder()
         // .layer(

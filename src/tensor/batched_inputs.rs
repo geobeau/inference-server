@@ -1,3 +1,4 @@
+use log::debug;
 #[cfg(feature = "loom")]
 use loom::cell::UnsafeCell;
 #[cfg(feature = "loom")]
@@ -34,6 +35,22 @@ enum BatchState {
     ReadyToUse,
 }
 
+// Ensure accounting when tasks are canceled
+pub struct WriteReservation<'a> {
+    tensor: &'a TensorBatch,
+}
+
+impl <'a> Drop for WriteReservation<'a> {
+    fn drop(&mut self) {
+        let slot_written = self.tensor.written_slots.fetch_sub(1, Ordering::Release);
+        if slot_written - 1 == 0 {
+            self.tensor.reset();
+            println!("output buffer reset");
+            self.tensor.state.replace(BatchState::ReadyToUse);
+        }
+    }
+}
+
 pub struct TensorBatch {
     #[cfg(feature = "loom")]
     input_data: HashMap<String, Vec<UnsafeCell<Vec<u8>>>>,
@@ -52,6 +69,19 @@ unsafe impl Send for TensorBatch {}
 unsafe impl Sync for TensorBatch {}
 
 impl TensorBatch {
+    fn reserve_write_slot(&self) -> WriteReservation {
+        let slot_written = self.written_slots.fetch_add(1, Ordering::Release);
+        if slot_written + 1 == self.batch_size {
+            self.state.replace(BatchState::Written);
+            println!("Notifying executors that batch is ready");
+            self.executor_notifier.notify_one();
+        }
+
+        return WriteReservation {
+            tensor: &self
+        }
+    }
+
     pub fn new(batch_size: usize, inputs: &Vec<&Input>) -> Result<TensorBatch, ()> {
         #[cfg(feature = "loom")]
         {
@@ -112,23 +142,12 @@ impl TensorBatch {
         let output_notifier = self.output_notifier.notified();
 
         // Mark this slot as written
-        let slot_written = self.written_slots.fetch_add(1, Ordering::Release);
-        if slot_written + 1 == self.batch_size {
-            self.state.replace(BatchState::Written);
-            println!("Notifying executors that batch is ready");
-            self.executor_notifier.notify_one();
-        }
+        let reserved_slot = self.reserve_write_slot();
 
         output_notifier.await;
-
         let output = self.get_output(slot);
-
-        let slot_written = self.written_slots.fetch_sub(1, Ordering::Release);
-        if slot_written - 1 == 0 {
-            self.reset();
-            println!("output buffer reset");
-            self.state.replace(BatchState::ReadyToUse);
-        }
+        
+        drop(reserved_slot);
         return Some(output)
     }
 

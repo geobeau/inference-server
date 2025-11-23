@@ -27,6 +27,7 @@ console-subscriber = "0.4.1"
 num-traits = "0.2.19"
 arc-swap = "1.7.1"
 bytemuck = "1.24.0"
+log = "0.4.28"
 
 [profile.dev]
 opt-level = 2
