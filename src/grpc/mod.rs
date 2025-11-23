@@ -127,7 +127,11 @@ impl GrpcInferenceService for TritonService {
                     &dimensions,
                     &request_ref.raw_input_contents[i],
                 );
-                let input_shape = proxy.model_metadata.input_set.get(&req_input.name).expect("Input provided not in the model");
+                let input_shape = proxy
+                    .model_metadata
+                    .input_set
+                    .get(&req_input.name)
+                    .expect("Input provided not in the model");
                 assert_eq!(tensor.shape(), input_shape, "expected the shape to match");
                 inputs.insert(req_input.name.clone(), tensor);
             });

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use log::{debug, info};
-use ort::{ session::Session};
+use ort::session::Session;
 
 use crate::{scheduler::ModelProxy, tensor::batched_tensor::BatchedOutputs};
 
@@ -16,7 +16,6 @@ impl OnnxExecutor {
         println!("executor started");
 
         loop {
-
             println!("trying to execute another batch");
             self.model
                 .data

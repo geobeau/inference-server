@@ -122,7 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 })
                 .collect();
-            
+
             let mut input_set = HashMap::new();
             let input_metadata = session
                 .inputs

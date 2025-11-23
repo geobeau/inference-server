@@ -23,7 +23,7 @@ macro_rules! pop_tensor_slice {
         let (new_shape, data) = $new_tensor.try_extract_tensor_mut::<$ty>().unwrap();
         let (_, inner_data) = $inner.try_extract_tensor::<$ty>().unwrap();
         let tensor_size = new_shape.num_elements();
-        data.copy_from_slice(&inner_data[$offset * tensor_size..($offset+1) * tensor_size]);
+        data.copy_from_slice(&inner_data[$offset * tensor_size..($offset + 1) * tensor_size]);
     }};
 }
 
@@ -37,7 +37,10 @@ impl BatchableInputs {
         inputs.iter().for_each(|input| {
             let shape = input.input_type.tensor_shape().unwrap();
             let data_type = input.input_type.tensor_type().unwrap();
-            inner_inputs.insert(input.name.clone(), BatchableTensor::new(data_type, shape, batch_size));
+            inner_inputs.insert(
+                input.name.clone(),
+                BatchableTensor::new(data_type, shape, batch_size),
+            );
         });
 
         BatchableInputs {

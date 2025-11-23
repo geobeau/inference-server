@@ -1,6 +1,8 @@
 use std::{
+    cell::RefCell,
     collections::HashMap,
     sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
 };
 
 use log::debug;
@@ -9,7 +11,10 @@ use ort::{
     value::{DynTensor, DynTensorValueType, ValueRef},
 };
 use prost::bytes::buf;
-use tokio::sync::Notify;
+use tokio::{
+    sync::Notify,
+    time::{sleep_until, Instant},
+};
 
 use crate::tensor::{
     batched_inputs::{AppendError, TensorBatch},
@@ -82,17 +87,17 @@ impl BatchRingBuffer {
                 return;
             }
             if self.buffer[tail].is_ready_to_use() {
-                println!("{} {} {}", tail, (tail+1), (tail+1) & self.mask);
+                println!("{} {} {}", tail, (tail + 1), (tail + 1) & self.mask);
                 match self.tail.compare_exchange_weak(
                     tail,
-                    (tail+1) & self.mask,
+                    (tail + 1) & self.mask,
                     Ordering::AcqRel,
                     Ordering::Acquire,
                 ) {
                     Ok(_) => {
-                        println!("Moved tail to {}", (tail+1) & self.mask);
+                        println!("Moved tail to {}", (tail + 1) & self.mask);
                         continue;
-                    },
+                    }
                     Err(_) => continue,
                 }
             } else {
@@ -102,7 +107,6 @@ impl BatchRingBuffer {
                 return;
             }
         }
-
     }
 
     /// Append data to the current buffer, moving to next if full
@@ -122,48 +126,54 @@ impl BatchRingBuffer {
 
             // Try to append to current buffer
             println!("RingBuffer: appending to {buffer_idx}");
-            match buffer.infer(data).await {
-                Some(output) => {
-                    if buffer.is_ready_to_use() {
+            match buffer.append_on_slot(data) {
+                Some(reservation) => {
+                    if reservation.should_execute().await {
+                        self.try_move_head(head).await;
+                        buffer.close_for_write();
                         self.update_tail_to_next_in_use();
                     }
-                    return Ok(output)
-                },
+                    
+                    return Ok(buffer.get_data_from_slot(reservation).await);
+                }
                 None => {
                     // Buffer is full, try to move to next
-                    let tail = self.tail.load(Ordering::Acquire);
-
-                    // Check if we have space (at least one buffer available)
-
-                    let new_head = (head + 1) & self.mask;
-                    if tail == new_head {
-                        self.executor_notifier.notify_one();
-                        println!("RingBuffer: All buffer full, waiting for buffer capacity");
-                        self.infer_full_notifier.notified().await;
-                        continue;
-                        // return Err(AppendError::AllBuffersFull);
-                    }
-
-                    // Use CAS to ensure only one thread advances head
-                    match self.head.compare_exchange_weak(
-                        head,
-                        new_head,
-                        Ordering::AcqRel,
-                        Ordering::Acquire,
-                    ) {
-                        Ok(_) => {
-                            println!("RingBuffer: mask {} {}", self.mask, (head + 1));
-                            println!("RingBuffer: buffer full, moving up {head} to {new_head} (tail: {tail})");
-                            self.executor_notifier.notify_one();
-                            // Successfully moved to next buffer, retry append
-                            continue;
-                        }
-                        Err(_) => {
-                            // Another thread moved head, retry with new head
-                            continue;
-                        }
-                    }
+                    self.try_move_head(head).await;
                 }
+            }
+        }
+    }
+
+    async fn try_move_head(&self, current_head: usize) {
+        let tail = self.tail.load(Ordering::Acquire);
+
+        // Check if we have space (at least one buffer available)
+        let new_head = (current_head + 1) & self.mask;
+        if tail == new_head {
+            self.executor_notifier.notify_one();
+            println!("RingBuffer: All buffer full, waiting for buffer capacity");
+            self.infer_full_notifier.notified().await;
+            return;
+        }
+
+        // Use CAS to ensure only one thread advances head
+        match self.head.compare_exchange_weak(
+            current_head,
+            new_head,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        ) {
+            Ok(_) => {
+                println!("RingBuffer: mask {} {}", self.mask, (current_head + 1));
+                println!("RingBuffer: buffer full, moving up {current_head} to {new_head} (tail: {tail})");
+
+                self.executor_notifier.notify_one();
+                // Successfully moved to next buffer, retry append
+                return;
+            }
+            Err(_) => {
+                // Another thread moved head, retry with new head
+                return;
             }
         }
     }
@@ -184,7 +194,6 @@ impl BatchRingBuffer {
                     continue;
                 }
             };
-
 
             println!("+Executor: Got a buffer to execute");
             return buffer.execute_on_batch(f).await;
