@@ -44,7 +44,8 @@ pub struct TensorBatch {
     reserved_slots: AtomicUsize,
     written_slots: AtomicUsize,
     state: RefCell<BatchState>,
-    notifier: Notify,
+    output_notifier: Notify,
+    executor_notifier: Notify,
 }
 
 unsafe impl Send for TensorBatch {}
@@ -82,7 +83,7 @@ impl TensorBatch {
                     ort::value::ValueType::Map { key: _, value: _ } => todo!(),
                     ort::value::ValueType::Optional(_value_type) => todo!(),
                 };
-                let tensor = BatchableTensor::new(*ty, shape);
+                let tensor = BatchableTensor::new(*ty, shape, batch_size);
                 input_data.insert(input.name.clone(), UnsafeCell::from(tensor));
             });
 
@@ -93,7 +94,8 @@ impl TensorBatch {
                 reserved_slots: AtomicUsize::new(0),
                 written_slots: AtomicUsize::new(0),
                 state: RefCell::new(BatchState::Writtable),
-                notifier: Notify::new(),
+                output_notifier: Notify::new(),
+                executor_notifier: Notify::new(),
             })
         }
     }
@@ -107,20 +109,24 @@ impl TensorBatch {
             None => return None,
         };
 
-        let notifier = self.notifier.notified();
+        let output_notifier = self.output_notifier.notified();
 
         // Mark this slot as written
         let slot_written = self.written_slots.fetch_add(1, Ordering::Release);
         if slot_written + 1 == self.batch_size {
             self.state.replace(BatchState::Written);
+            println!("Notifying executors that batch is ready");
+            self.executor_notifier.notify_one();
         }
 
-        notifier.await;
+        output_notifier.await;
+
         let output = self.get_output(slot);
 
         let slot_written = self.written_slots.fetch_sub(1, Ordering::Release);
-        if slot_written - 1 == self.batch_size {
+        if slot_written - 1 == 0 {
             self.reset();
+            println!("output buffer reset");
             self.state.replace(BatchState::ReadyToUse);
         }
         return Some(output)
@@ -136,6 +142,7 @@ impl TensorBatch {
     pub fn append(&self, data: &HashMap<String, DynTensor>) -> Option<usize> {
         let slot = self.reserved_slots.fetch_add(1, Ordering::SeqCst);
         if slot >= self.batch_size {
+            println!("Full {slot}/{}", self.batch_size);
             return None;
         }
 
@@ -161,22 +168,28 @@ impl TensorBatch {
         Some(slot)
     }
 
-    pub fn execute_on_batch<F>(&self, f: F)
+    pub async fn execute_on_batch<F>(&self, f: F)
     where
         F: FnOnce(HashMap<String, ValueRef<'_, DynTensorValueType>>) -> BatchedOutputs,
     {
+        println!("Executor: waiting data ready");
+        self.executor_notifier.notified().await;
+        println!("Executor: data ready");
         let input = self.get_data_view().unwrap();
         unsafe {
             let ptr = self.output_data.get();
+            println!("Executor: execute");
             *ptr = Some(f(input));
         }
         self.state.replace(BatchState::Executed);
         fence(Ordering::Release);
-        self.notifier.notify_waiters();
+        self.output_notifier.notify_waiters();
+        println!("Executor: notified that output is ready")
     }
 
     pub fn get_data_view(&self) -> Option<HashMap<String, ValueRef<'_, DynTensorValueType>>> {
-        if self.written_slots.load(Ordering::Acquire) == self.batch_size {
+        let written_slots = self.written_slots.load(Ordering::Acquire);
+        if written_slots == self.batch_size {
             #[cfg(feature = "loom")]
             {
                 // For loom, we can't safely return a reference
@@ -197,6 +210,7 @@ impl TensorBatch {
                 }
             }
         } else {
+            println!("{}", written_slots);
             None
         }
     }

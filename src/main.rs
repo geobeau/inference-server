@@ -27,7 +27,7 @@ use crate::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    console_subscriber::init();
+    // console_subscriber::init();
     let addr = "0.0.0.0:8001".parse()?; // Triton default gRPC port is 8001
                                         // Initialize our service with S3 connection details
 
@@ -121,7 +121,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 })
                 .collect();
-
+            
+            let mut input_set = HashMap::new();
             let input_metadata = session
                 .inputs
                 .iter()
@@ -136,6 +137,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .collect();
                     // println!("tensor shape {} {:?}", input.name.clone(), tensor_shape);
                     // let tensor_ = input.input_type
+                    let mut input_shape = input.input_type.tensor_shape().unwrap().clone();
+                    input_shape[0] = 1;
+                    input_set.insert(input.name.clone(), input_shape);
                     TensorMetadata {
                         name: input.name.clone(),
                         datatype: tensor_type.to_metadata_string(),
@@ -169,6 +173,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             model_metadata = Some(ModelMetadata {
                 input_meta: input_metadata,
                 output_meta: output_metadata,
+                input_set: input_set,
             });
 
             model_config = Some(ModelConfig {

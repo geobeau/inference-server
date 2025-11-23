@@ -15,6 +15,8 @@ impl OnnxExecutor {
         println!("executor started");
 
         loop {
+
+            println!("trying to execute another batch");
             self.model
                 .data
                 .execute_on_batch(|inputs| {
@@ -22,6 +24,7 @@ impl OnnxExecutor {
                     BatchedOutputs::new(session_outputs)
                 })
                 .await;
+            println!("executed batch")
         }
     }
 }

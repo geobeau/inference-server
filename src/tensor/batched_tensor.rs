@@ -32,12 +32,12 @@ pub struct BatchableInputs {
 }
 
 impl BatchableInputs {
-    pub fn new(inputs: &[Input], _batch_size: i64) -> BatchableInputs {
+    pub fn new(inputs: &[Input], batch_size: usize) -> BatchableInputs {
         let mut inner_inputs = HashMap::with_capacity(inputs.len());
         inputs.iter().for_each(|input| {
             let shape = input.input_type.tensor_shape().unwrap();
             let data_type = input.input_type.tensor_type().unwrap();
-            inner_inputs.insert(input.name.clone(), BatchableTensor::new(data_type, shape));
+            inner_inputs.insert(input.name.clone(), BatchableTensor::new(data_type, shape, batch_size));
         });
 
         BatchableInputs {
@@ -161,9 +161,10 @@ impl BatchedTensor {
 }
 
 impl BatchableTensor {
-    pub fn new(data_type: TensorElementType, shape: &Shape) -> BatchableTensor {
-        let batch_shape = shape.clone();
-        assert_eq!(shape[0], -1); // Ensure the shape is dynamic
+    pub fn new(data_type: TensorElementType, shape: &Shape, batch_size: usize) -> BatchableTensor {
+        assert_eq!(shape[0], -1, "Shape is not dynamic");
+        let mut batch_shape = shape.clone();
+        batch_shape[0] = batch_size as i64;
         BatchableTensor {
             inner_tensor: DynTensor::new(&Allocator::default(), data_type, batch_shape).unwrap(),
             data_type,

@@ -43,6 +43,10 @@
 //     pub trace: Trace,
 // }
 
+use std::collections::{HashMap, HashSet};
+
+use ort::tensor::Shape;
+
 use crate::{
     grpc::inference::{model_metadata_response::TensorMetadata, ModelConfig},
     tensor::tensor_ringbuffer::BatchRingBuffer,
@@ -52,6 +56,7 @@ use crate::{
 pub struct ModelMetadata {
     pub input_meta: Vec<TensorMetadata>,
     pub output_meta: Vec<TensorMetadata>,
+    pub input_set: HashMap<String, Shape>
 }
 
 pub struct ModelProxy {

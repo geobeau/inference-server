@@ -120,20 +120,14 @@ impl GrpcInferenceService for TritonService {
             .iter()
             .enumerate()
             .for_each(|(i, req_input)| {
-                // println!(
-                //     "{} {} {:?} {}",
-                //     req_input.name,
-                //     req_input.datatype,
-                //     (req_input.shape),
-                //     request_ref.raw_input_contents[i].len()
-                // );
                 let dimensions: Vec<usize> = req_input.shape.iter().map(|i| *i as usize).collect();
                 let tensor = dyntensor_from_bytes(
                     DataType::from_str(&req_input.datatype),
                     &dimensions,
                     &request_ref.raw_input_contents[i],
                 );
-
+                let input_shape = proxy.model_metadata.input_set.get(&req_input.name).expect("Input provided not in the model");
+                assert_eq!(tensor.shape(), input_shape, "expected the shape to match");
                 inputs.insert(req_input.name.clone(), tensor);
             });
 
@@ -163,6 +157,8 @@ impl GrpcInferenceService for TritonService {
                 }
             })
             .collect();
+
+        println!("Request complete");
 
         Ok(Response::new(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),
