@@ -1,13 +1,12 @@
-use log::debug;
 #[cfg(feature = "loom")]
 use loom::cell::UnsafeCell;
 #[cfg(feature = "loom")]
 use loom::sync::atomic::{fence, AtomicUsize, Ordering};
-use tokio::time::{Instant, sleep_until};
 #[cfg(not(feature = "loom"))]
 use std::cell::UnsafeCell;
 use std::cmp::min;
 use std::time::Duration;
+use tokio::time::{sleep_until, Instant};
 
 use ort::session::Input;
 
@@ -15,14 +14,13 @@ use ort::value::{DynTensor, DynTensorValueType, ValueRef};
 
 use tokio::sync::Notify;
 
-use std::cell::RefCell;
-
 use std::collections::HashMap;
 use std::sync::atomic::{fence, AtomicUsize, Ordering};
 
 #[cfg(not(feature = "loom"))]
 use crate::tensor::batched_tensor::BatchableTensor;
 use crate::tensor::batched_tensor::BatchedOutputs;
+use crate::tensor::tensor_ringbuffer::BatchRingBuffer;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppendError {
@@ -30,55 +28,127 @@ pub enum AppendError {
     NoBufferReady,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum BatchState {
-    Writtable,
-    Written,
-    Executed,
-    ReadyToUse,
+pub struct BatchState {
+    // 0 -> OpenToWrite
+    // 1 -> Written
+    // 2 -> Executed
+    // 3 -> ReadyToUse
+    state: AtomicUsize,
+    ready_for_execute_notifier: Notify,
+    output_ready_notifier: Notify,
+}
+
+impl BatchState {
+    fn new() -> BatchState {
+        BatchState {
+            state: AtomicUsize::new(0),
+            ready_for_execute_notifier: Notify::new(),
+            output_ready_notifier: Notify::new(),
+        }
+    }
+
+    pub fn transition_to_written(&self) -> Option<()> {
+        match self
+            .state
+            .compare_exchange_weak(0, 1, Ordering::AcqRel, Ordering::Acquire)
+        {
+            Ok(_) => {
+                self.ready_for_execute_notifier.notify_one();
+                Some(())
+            }
+            Err(_) => None,
+        }
+    }
+    pub async fn wait_written(&self) {
+        let notified = self.ready_for_execute_notifier.notified();
+        if self.state.load(Ordering::SeqCst) != 1 {
+            notified.await;
+        }
+    }
+    pub fn transition_to_executed(&self) -> Option<()> {
+        match self
+            .state
+            .compare_exchange_weak(1, 2, Ordering::AcqRel, Ordering::Acquire)
+        {
+            Ok(_) => {
+                self.output_ready_notifier.notify_one();
+                Some(())
+            }
+            Err(_) => None,
+        }
+    }
+    pub async fn wait_executed(&self) {
+        let notified = self.output_ready_notifier.notified();
+        if self.state.load(Ordering::SeqCst) != 2 {
+            notified.await;
+        }
+    }
+    pub fn transition_to_ready_to_use(&self) -> Option<()> {
+        match self
+            .state
+            .compare_exchange_weak(2, 0, Ordering::AcqRel, Ordering::Acquire)
+        {
+            Ok(_) => Some(()),
+            Err(_) => None,
+        }
+    }
+    pub fn is_ready_to_use(&self) -> bool {
+        self.state.load(Ordering::SeqCst) == 0
+    }
 }
 
 // Ensure accounting when tasks are canceled
 pub struct WriteReservation<'a> {
     tensor: &'a TensorBatch,
-    slot: usize,
+    ring_buffer: &'a BatchRingBuffer,
+    pub slot: usize,
 }
 
 impl WriteReservation<'_> {
     pub async fn should_execute(&self) -> bool {
         if self.slot + 1 == self.tensor.batch_size {
             self.tensor.full_notifier.notify_one();
+            println!("{} slot 0 notified", self.tensor.id);
             return true;
         }
         // If this is the first slot, need to keep track of the timeout
         else if self.slot == 0 {
+            println!("{} slot 0 waiting on notifier or timeout", self.tensor.id);
             tokio::select! {
-                _ = sleep_until(Instant::now() + Duration::from_millis(1)) => {
-                    println!("buffer timeout");
+                _ = sleep_until(Instant::now() + Duration::from_millis(10)) => {
+                    println!("{} slot 0 buffer timeout", self.tensor.id);
                     return true
                 },
                 _ = self.tensor.full_notifier.notified() => {
+                    println!("{} slot 0 buffer notified", self.tensor.id);
                     return false
                 }
             }
         }
 
-        return false
+        false
     }
 }
 
 impl<'a> Drop for WriteReservation<'a> {
     fn drop(&mut self) {
         let slot_written = self.tensor.written_slots.fetch_sub(1, Ordering::Release);
+        println!(
+            "{} dropping reservation, remaining {}({})",
+            self.tensor.id,
+            slot_written,
+            slot_written - 1
+        );
         if slot_written - 1 == 0 {
             self.tensor.reset();
-            println!("output buffer reset");
-            self.tensor.state.replace(BatchState::ReadyToUse);
+            println!("{} output buffer reset", self.tensor.id);
+            self.ring_buffer.update_tail_to_next_in_use();
         }
     }
 }
 
 pub struct TensorBatch {
+    id: usize,
     #[cfg(feature = "loom")]
     input_data: HashMap<String, Vec<UnsafeCell<Vec<u8>>>>,
     #[cfg(not(feature = "loom"))]
@@ -87,8 +157,7 @@ pub struct TensorBatch {
     batch_size: usize,
     reserved_slots: AtomicUsize,
     written_slots: AtomicUsize,
-    state: RefCell<BatchState>,
-    output_notifier: Notify,
+    state: BatchState,
     full_notifier: Notify,
 }
 
@@ -98,13 +167,17 @@ unsafe impl Sync for TensorBatch {}
 impl TensorBatch {
     pub fn close_for_write(&self) {
         loop {
-            println!("Closing buffer");
+            println!("{} Closing buffer", self.id);
             let reserved_slots = self.reserved_slots.load(Ordering::SeqCst);
             let written_slots = self.written_slots.load(Ordering::SeqCst);
             // Ensure nothing is writing at this moment
             // don't close if something is writing.
-            println!("{reserved_slots} == min({written_slots}, {})", self.batch_size);
-            if written_slots == min(reserved_slots, self.batch_size) {
+            println!(
+                "{} {reserved_slots} == min({written_slots}, {})",
+                self.id, self.batch_size
+            );
+            let clamped_slots = min(reserved_slots, self.batch_size);
+            if written_slots == clamped_slots {
                 // Ensure buffer appear full
                 match self.reserved_slots.compare_exchange_weak(
                     reserved_slots,
@@ -113,11 +186,13 @@ impl TensorBatch {
                     Ordering::Acquire,
                 ) {
                     Ok(_) => {
-                        self.state.replace(BatchState::Written);
+                        println!("{} Buffer closed", self.id);
+                        self.state.transition_to_written().unwrap();
                         return;
                     }
                     Err(_) => {
                         // Something wrote while we were closing
+                        println!("{} Collision, retrying", self.id);
                         continue;
                     }
                 }
@@ -127,12 +202,21 @@ impl TensorBatch {
         }
     }
 
-    fn reserve_write_slot(&self, slot: usize) -> WriteReservation {
+    fn reserve_write_slot<'a>(
+        &'a self,
+        slot: usize,
+        ring_buffer: &'a BatchRingBuffer,
+    ) -> WriteReservation<'a> {
+        println!("{} genarating write reservation for {slot}", self.id);
         self.written_slots.fetch_add(1, Ordering::Release);
-        return WriteReservation { tensor: &self, slot };
+        WriteReservation {
+            tensor: self,
+            slot,
+            ring_buffer,
+        }
     }
 
-    pub fn new(batch_size: usize, inputs: &Vec<&Input>) -> Result<TensorBatch, ()> {
+    pub fn new(id: usize, batch_size: usize, inputs: &Vec<&Input>) -> Result<TensorBatch, ()> {
         #[cfg(feature = "loom")]
         {
             let mut data = Vec::with_capacity(capacity);
@@ -168,56 +252,57 @@ impl TensorBatch {
             });
 
             Ok(TensorBatch {
+                id,
                 input_data,
                 output_data: UnsafeCell::from(None),
                 batch_size,
                 reserved_slots: AtomicUsize::new(0),
                 written_slots: AtomicUsize::new(0),
-                state: RefCell::new(BatchState::Writtable),
-                output_notifier: Notify::new(),
+                state: BatchState::new(),
                 full_notifier: Notify::new(),
             })
         }
     }
 
-    pub fn append_on_slot(
-        &self,
+    pub fn append_on_slot<'a>(
+        &'a self,
         data: &HashMap<String, DynTensor>,
-    ) -> Option<WriteReservation> {
-        let slot = match self.append(data) {
-            Some(slot) => slot,
-            None => return None,
-        };
+        ring_buffer: &'a BatchRingBuffer,
+    ) -> Option<WriteReservation<'a>> {
+        let slot = self.append(data)?;
 
         // Mark this slot as written
-        let reserved_slot = self.reserve_write_slot(slot);
-        return Some(reserved_slot);
+        let reserved_slot = self.reserve_write_slot(slot, ring_buffer);
+        Some(reserved_slot)
     }
-
 
     pub async fn get_data_from_slot(
         &self,
         reservation: WriteReservation<'_>,
     ) -> HashMap<String, DynTensor> {
-        self.output_notifier.notified().await;
+        self.state.wait_executed().await;
+        println!("{} Consuming slot {} ", self.id, reservation.slot);
         let output = self.get_output(reservation.slot);
 
+        println!("{} Dropping reservation {} ", self.id, reservation.slot);
         drop(reservation);
-        return output;
+        output
     }
-
 
     fn get_output(&self, slot: usize) -> HashMap<String, DynTensor> {
         unsafe {
             let data = (*self.output_data.get()).as_ref().unwrap();
-            return data.pop_outputs(slot);
+            data.pop_outputs(slot)
         }
     }
 
     pub fn append(&self, data: &HashMap<String, DynTensor>) -> Option<usize> {
         let slot = self.reserved_slots.fetch_add(1, Ordering::SeqCst);
         if slot >= self.batch_size {
-            println!("Full {slot}/{}", self.batch_size);
+            println!("{} Full {slot}/{}", self.id, self.batch_size);
+            if slot > self.batch_size * 20 {
+                panic!("Buffer super full, probable deadlock")
+            }
             return None;
         }
 
@@ -247,21 +332,21 @@ impl TensorBatch {
     where
         F: FnOnce(HashMap<String, ValueRef<'_, DynTensorValueType>>) -> BatchedOutputs,
     {
-        println!("Executor: data ready");
-        let input = self.get_data_view();
+        println!("{} Executor: data ready", self.id);
+        let input = self.get_data_view().await;
         unsafe {
             let ptr = self.output_data.get();
-            println!("Executor: execute");
+            println!("{} Executor: execute", self.id);
             *ptr = Some(f(input));
         }
-        self.state.replace(BatchState::Executed);
         fence(Ordering::Release);
-        self.output_notifier.notify_waiters();
-        println!("Executor: notified that output is ready")
+        self.state.transition_to_executed().unwrap();
+        println!("{} Executor: notifying that output is ready", self.id)
     }
 
-    pub fn get_data_view(&self) -> HashMap<String, ValueRef<'_, DynTensorValueType>> {
-        assert_eq!(*self.state.borrow(), BatchState::Written);
+    pub async fn get_data_view(&self) -> HashMap<String, ValueRef<'_, DynTensorValueType>> {
+        println!("{} Parking waiting for data ready", self.id);
+        self.state.wait_written().await;
         #[cfg(feature = "loom")]
         {
             // For loom, we can't safely return a reference
@@ -287,10 +372,11 @@ impl TensorBatch {
     pub fn reset(&self) {
         self.reserved_slots.store(0, Ordering::Release);
         self.written_slots.store(0, Ordering::Release);
+        self.state.transition_to_ready_to_use().unwrap();
     }
 
     pub fn is_ready_to_use(&self) -> bool {
-        *self.state.borrow() == BatchState::ReadyToUse
+        self.state.is_ready_to_use()
     }
 }
 

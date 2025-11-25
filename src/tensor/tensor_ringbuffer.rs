@@ -1,20 +1,13 @@
 use std::{
-    cell::RefCell,
     collections::HashMap,
     sync::atomic::{AtomicUsize, Ordering},
-    time::Duration,
 };
 
-use log::debug;
 use ort::{
     session::Input,
     value::{DynTensor, DynTensorValueType, ValueRef},
 };
-use prost::bytes::buf;
-use tokio::{
-    sync::Notify,
-    time::{sleep_until, Instant},
-};
+use tokio::sync::Notify;
 
 use crate::tensor::{
     batched_inputs::{AppendError, TensorBatch},
@@ -64,8 +57,8 @@ impl BatchRingBuffer {
             panic!("Buffer is not power of 2: {batch_buffer_capacity}")
         }
         let mut buffer = Vec::with_capacity(batch_buffer_capacity);
-        for _ in 0..batch_buffer_capacity {
-            buffer.push(TensorBatch::new(batch_size, inputs).unwrap());
+        for i in 0..batch_buffer_capacity {
+            buffer.push(TensorBatch::new(i, batch_size, inputs).unwrap());
         }
         BatchRingBuffer {
             buffer,
@@ -78,7 +71,7 @@ impl BatchRingBuffer {
         }
     }
 
-    fn update_tail_to_next_in_use(&self) {
+    pub fn update_tail_to_next_in_use(&self) {
         loop {
             let tail = self.tail.load(Ordering::Acquire);
             let head = self.head.load(Ordering::Acquire);
@@ -86,19 +79,28 @@ impl BatchRingBuffer {
                 println!("All buffer put back in queue");
                 return;
             }
+
+            let new_tail = (tail + 1) & self.mask;
+            println!("tail: updating: {} {}", tail, new_tail);
+            println!(
+                "tail: updating tail {}",
+                self.buffer[tail].is_ready_to_use()
+            );
             if self.buffer[tail].is_ready_to_use() {
-                println!("{} {} {}", tail, (tail + 1), (tail + 1) & self.mask);
                 match self.tail.compare_exchange_weak(
                     tail,
-                    (tail + 1) & self.mask,
+                    new_tail,
                     Ordering::AcqRel,
                     Ordering::Acquire,
                 ) {
                     Ok(_) => {
-                        println!("Moved tail to {}", (tail + 1) & self.mask);
+                        println!("tail: Moved tail to {}", (tail + 1) & self.mask);
                         continue;
                     }
-                    Err(_) => continue,
+                    Err(_) => {
+                        println!("tail: update collision");
+                        continue;
+                    }
                 }
             } else {
                 // All ready have been put back in the queue
@@ -126,14 +128,18 @@ impl BatchRingBuffer {
 
             // Try to append to current buffer
             println!("RingBuffer: appending to {buffer_idx}");
-            match buffer.append_on_slot(data) {
+            match buffer.append_on_slot(data, self) {
                 Some(reservation) => {
                     if reservation.should_execute().await {
+                        println!(
+                            "{} slot {} Attempting to close {buffer_idx}",
+                            buffer_idx, reservation.slot
+                        );
                         self.try_move_head(head).await;
+                        println!("{} slot {} Closing buffer", buffer_idx, reservation.slot);
                         buffer.close_for_write();
-                        self.update_tail_to_next_in_use();
                     }
-                    
+
                     return Ok(buffer.get_data_from_slot(reservation).await);
                 }
                 None => {
@@ -169,11 +175,9 @@ impl BatchRingBuffer {
 
                 self.executor_notifier.notify_one();
                 // Successfully moved to next buffer, retry append
-                return;
             }
             Err(_) => {
                 // Another thread moved head, retry with new head
-                return;
             }
         }
     }
@@ -196,14 +200,16 @@ impl BatchRingBuffer {
             };
 
             println!("+Executor: Got a buffer to execute");
-            return buffer.execute_on_batch(f).await;
+            buffer.execute_on_batch(f).await;
+            return;
         }
     }
 
     pub fn get_buffer_to_use(&self) -> Result<&TensorBatch, AppendError> {
         let in_use = self.in_use.load(Ordering::Acquire);
         let head = self.head.load(Ordering::Acquire);
-        println!("RingBuffer: in_use:{in_use}/head:{head}");
+        let tail = self.tail.load(Ordering::Acquire);
+        println!("RingBuffer: in_use:{in_use}/head:{head}/tail:{tail}");
         if in_use == head {
             return Err(AppendError::NoBufferReady);
         }
