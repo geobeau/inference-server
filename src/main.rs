@@ -174,7 +174,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             model_metadata = Some(ModelMetadata {
                 input_meta: input_metadata,
                 output_meta: output_metadata,
-                input_set: input_set,
+                input_set,
             });
 
             model_config = Some(ModelConfig {
