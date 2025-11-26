@@ -74,19 +74,20 @@ impl BatchRingBuffer {
     pub fn update_tail_to_next_in_use(&self) {
         loop {
             let tail = self.tail.load(Ordering::Acquire);
-            let head = self.head.load(Ordering::Acquire);
-            if tail == head {
-                println!("All buffer put back in queue");
+            let in_use = self.in_use.load(Ordering::Acquire);
+            if tail == in_use {
+                // println!("All buffer put back in queue");
                 return;
             }
 
             let new_tail = (tail + 1) & self.mask;
-            println!("tail: updating: {} {}", tail, new_tail);
-            println!(
-                "tail: updating tail {}",
-                self.buffer[tail].is_ready_to_use()
-            );
-            if self.buffer[tail].is_ready_to_use() {
+            // println!("tail: updating: {} {}", tail, new_tail);
+            // println!(
+            //     "tail: updating tail {}",
+            //     self.buffer[tail].is_ready_to_use_or_open()
+            // );
+
+            if self.buffer[tail].is_ready_to_use_or_open() {
                 match self.tail.compare_exchange_weak(
                     tail,
                     new_tail,
@@ -94,17 +95,17 @@ impl BatchRingBuffer {
                     Ordering::Acquire,
                 ) {
                     Ok(_) => {
-                        println!("tail: Moved tail to {}", (tail + 1) & self.mask);
+                        // println!("tail: Moved tail to {}", new_tail);
                         continue;
                     }
                     Err(_) => {
-                        println!("tail: update collision");
+                        // println!("tail: update collision");
                         continue;
                     }
                 }
             } else {
                 // All ready have been put back in the queue
-                println!("All ready buffers put back in queue");
+                // println!("All ready buffers put back in queue");
                 self.infer_full_notifier.notify_waiters();
                 return;
             }
@@ -127,16 +128,16 @@ impl BatchRingBuffer {
             let buffer = &self.buffer[buffer_idx];
 
             // Try to append to current buffer
-            println!("RingBuffer: appending to {buffer_idx}");
+            // println!("RingBuffer: appending to {buffer_idx}");
             match buffer.append_on_slot(data, self) {
                 Some(reservation) => {
                     if reservation.should_execute().await {
-                        println!(
-                            "{} slot {} Attempting to close {buffer_idx}",
-                            buffer_idx, reservation.slot
-                        );
+                        // println!(
+                        //     "{} slot {} Attempting to close {buffer_idx}",
+                        //     buffer_idx, reservation.slot
+                        // );
                         self.try_move_head(head).await;
-                        println!("{} slot {} Closing buffer", buffer_idx, reservation.slot);
+                        // println!("{} slot {} Closing buffer", buffer_idx, reservation.slot);
                         buffer.close_for_write();
                     }
 
@@ -157,7 +158,7 @@ impl BatchRingBuffer {
         let new_head = (current_head + 1) & self.mask;
         if tail == new_head {
             self.executor_notifier.notify_one();
-            println!("RingBuffer: All buffer full, waiting for buffer capacity");
+            // println!("RingBuffer: All buffer full, waiting for buffer capacity");
             self.infer_full_notifier.notified().await;
             return;
         }
@@ -170,8 +171,8 @@ impl BatchRingBuffer {
             Ordering::Acquire,
         ) {
             Ok(_) => {
-                println!("RingBuffer: mask {} {}", self.mask, (current_head + 1));
-                println!("RingBuffer: buffer full, moving up {current_head} to {new_head} (tail: {tail})");
+                // println!("RingBuffer: mask {} {}", self.mask, (current_head + 1));
+                // println!("RingBuffer: buffer full, moving up {current_head} to {new_head} (tail: {tail})");
 
                 self.executor_notifier.notify_one();
                 // Successfully moved to next buffer, retry append
@@ -192,14 +193,14 @@ impl BatchRingBuffer {
             let buffer = match self.get_buffer_to_use() {
                 Ok(buffer) => buffer,
                 Err(_) => {
-                    println!("+Executor: Parking while waiting for buffer");
+                    // println!("+Executor: Parking while waiting for buffer");
                     executor_notifier.await;
-                    println!("+Executor: Notified that buffer can be executed");
+                    // println!("+Executor: Notified that buffer can be executed");
                     continue;
                 }
             };
 
-            println!("+Executor: Got a buffer to execute");
+            // println!("+Executor: Got a buffer to execute");
             buffer.execute_on_batch(f).await;
             return;
         }
@@ -209,13 +210,13 @@ impl BatchRingBuffer {
         let in_use = self.in_use.load(Ordering::Acquire);
         let head = self.head.load(Ordering::Acquire);
         let tail = self.tail.load(Ordering::Acquire);
-        println!("RingBuffer: in_use:{in_use}/head:{head}/tail:{tail}");
+        // println!("RingBuffer: in_use:{in_use}/head:{head}/tail:{tail}");
         if in_use == head {
             return Err(AppendError::NoBufferReady);
         }
 
         let new_in_use = (in_use + 1) & self.mask;
-        println!("Ringbuffer: giving buffer {in_use}");
+        // println!("Ringbuffer: giving buffer {in_use}");
         match self.in_use.compare_exchange_weak(
             in_use,
             new_in_use,
