@@ -9,7 +9,7 @@ use std::{collections::HashMap, sync::Arc};
 use tonic::transport::Server;
 
 use ort::{
-    execution_providers::{CPUExecutionProvider, OpenVINOExecutionProvider},
+    execution_providers::{CPUExecutionProvider, CUDAExecutionProvider, OpenVINOExecutionProvider},
     session::{builder::GraphOptimizationLevel, Session},
 };
 
@@ -38,30 +38,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut ring_buffer: Option<BatchRingBuffer> = None;
     let mut model_proxy: Option<Arc<scheduler::ModelProxy>> = None;
 
-    let batch_size = 16;
-    for i in 0..2 {
-        let vino_provider = OpenVINOExecutionProvider::default()
-            .with_device_type("CPU")
-            .build();
+    let batch_size = 64;
+    for i in 0..8 {
+        let cuda_provider = CUDAExecutionProvider::default().build().error_on_failure();
+
         let _cpu_provider = CPUExecutionProvider::default().build();
         let session = Session::builder()
             .unwrap()
-            .with_optimization_level(GraphOptimizationLevel::Level1)
+            .with_optimization_level(GraphOptimizationLevel::Level3)
             .unwrap()
-            .with_execution_providers([vino_provider])
+            .with_execution_providers([cuda_provider])
             .unwrap()
             .with_intra_threads(4)
             .unwrap()
             .with_log_level(ort::logging::LogLevel::Verbose)
             .unwrap()
-            .commit_from_file("samples/int64_to_float64.onnx")
+            .commit_from_file("samples/model.onnx")
             // .commit_from_file("samples/matmul.onnx")
             .unwrap();
 
         if i == 0 {
             let metadata = session.metadata().unwrap();
             let inputs = session.inputs.iter().collect();
-            ring_buffer = Some(BatchRingBuffer::new(8, batch_size as usize, &inputs));
+            ring_buffer = Some(BatchRingBuffer::new(64, batch_size as usize, &inputs));
 
             let inputs = session
                 .inputs
