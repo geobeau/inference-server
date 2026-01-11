@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicUsize, Ordering}, usize,
 };
 
 use ort::{
@@ -19,6 +19,8 @@ pub struct BatchRingBuffer {
     tail: AtomicUsize,
     in_use: AtomicUsize,
     head: AtomicUsize,
+    executor_in_flight: AtomicUsize,
+    batch_size: usize,
     // The mask is used for efficient modulo arithmetic to wrap around the ring buffer.
     // The Problem:
     // When you have a ring buffer with n buffers, you need to convert a continuously incrementing index (0, 1, 2, 3, 4, 5...) into a buffer position (0, 1, 2, 3, 0, 1, 2, 3...).
@@ -65,6 +67,8 @@ impl BatchRingBuffer {
             tail: AtomicUsize::new(0),
             in_use: AtomicUsize::new(0),
             head: AtomicUsize::new(0),
+            batch_size,
+            executor_in_flight: AtomicUsize::new(0),
             mask: batch_buffer_capacity - 1,
             executor_notifier: Notify::new(),
             infer_full_notifier: Notify::new(),
@@ -80,33 +84,30 @@ impl BatchRingBuffer {
                 return;
             }
 
-            let new_tail = (tail + 1) & self.mask;
-            // println!("tail: updating: {} {}", tail, new_tail);
+            let buffer_idx = tail & self.mask;
             // println!(
             //     "tail: updating tail {}",
             //     self.buffer[tail].is_ready_to_use_or_open()
             // );
 
-            if self.buffer[tail].is_ready_to_use_or_open() {
+            if self.buffer[buffer_idx].is_ready_to_use_or_open() {
                 match self.tail.compare_exchange_weak(
                     tail,
-                    new_tail,
+                    tail+1,
                     Ordering::AcqRel,
                     Ordering::Acquire,
                 ) {
                     Ok(_) => {
-                        // println!("tail: Moved tail to {}", new_tail);
+                        println!("tail: Moved tail to {}", tail+1);
+                        self.infer_full_notifier.notify_waiters();
                         continue;
                     }
                     Err(_) => {
-                        // println!("tail: update collision");
                         continue;
                     }
                 }
             } else {
                 // All ready have been put back in the queue
-                // println!("All ready buffers put back in queue");
-                self.infer_full_notifier.notify_waiters();
                 return;
             }
         }
@@ -130,7 +131,7 @@ impl BatchRingBuffer {
             // Try to append to current buffer
             // println!("RingBuffer: appending to {buffer_idx}");
             match buffer.append_on_slot(data, self) {
-                Some(reservation) => {
+                Ok(reservation) => {
                     if reservation.should_execute().await {
                         // println!(
                         //     "{} slot {} Attempting to close {buffer_idx}",
@@ -143,7 +144,15 @@ impl BatchRingBuffer {
 
                     return Ok(buffer.get_data_from_slot(reservation).await);
                 }
-                None => {
+                Err(slot) => {
+                    if slot > self.batch_size * 20 {
+                        panic!("Buffer super full, dumping useful data before panic: in flight executor {}\nTail:{}->Use:{}->Head:{}",
+                            self.executor_in_flight.load(Ordering::Relaxed),
+                            self.tail.load(Ordering::Relaxed),
+                            self.in_use.load(Ordering::Relaxed),
+                            self.head.load(Ordering::Relaxed),
+                        )
+                    }
                     // Buffer is full, try to move to next
                     self.try_move_head(head).await;
                 }
@@ -152,16 +161,22 @@ impl BatchRingBuffer {
     }
 
     async fn try_move_head(&self, current_head: usize) {
+        let head = self.head.load(Ordering::Acquire);
         let tail = self.tail.load(Ordering::Acquire);
+        if head != current_head {
+            println!("Head view stale, looping again");
+            return;
+        }
 
         // Check if we have space (at least one buffer available)
-        let new_head = (current_head + 1) & self.mask;
-        if tail == new_head {
-            self.executor_notifier.notify_one();
-            // println!("RingBuffer: All buffer full, waiting for buffer capacity");
+        if current_head.wrapping_sub(tail) >= self.buffer.len() {
+            // self.executor_notifier.notified().await;
+            println!("RingBuffer: All buffer full, waiting for buffer capacity: Tail:{tail}->Current Head:{head}");
             self.infer_full_notifier.notified().await;
             return;
         }
+
+        let new_head = head+1;
 
         // Use CAS to ensure only one thread advances head
         match self.head.compare_exchange_weak(
@@ -174,7 +189,7 @@ impl BatchRingBuffer {
                 // println!("RingBuffer: mask {} {}", self.mask, (current_head + 1));
                 // println!("RingBuffer: buffer full, moving up {current_head} to {new_head} (tail: {tail})");
 
-                self.executor_notifier.notify_one();
+                self.executor_notifier.notify_waiters();
                 // Successfully moved to next buffer, retry append
             }
             Err(_) => {
@@ -185,11 +200,12 @@ impl BatchRingBuffer {
 
     pub async fn execute_on_batch<F>(&self, f: F)
     where
-        F: FnOnce(HashMap<String, ValueRef<'_, DynTensorValueType>>) -> BatchedOutputs,
+        F: AsyncFnOnce(HashMap<String, ValueRef<'_, DynTensorValueType>>) -> BatchedOutputs,
     {
         loop {
             // Arm a executor_notifier in case no buffer are available
             let executor_notifier = self.executor_notifier.notified();
+
             let buffer = match self.get_buffer_to_use() {
                 Ok(buffer) => buffer,
                 Err(_) => {
@@ -199,9 +215,9 @@ impl BatchRingBuffer {
                     continue;
                 }
             };
-
-            // println!("+Executor: Got a buffer to execute");
+            self.executor_in_flight.fetch_add(1, Ordering::Relaxed);
             buffer.execute_on_batch(f).await;
+            self.executor_in_flight.fetch_sub(1, Ordering::Relaxed);
             return;
         }
     }
@@ -209,23 +225,22 @@ impl BatchRingBuffer {
     pub fn get_buffer_to_use(&self) -> Result<&TensorBatch, AppendError> {
         let in_use = self.in_use.load(Ordering::Acquire);
         let head = self.head.load(Ordering::Acquire);
-        let tail = self.tail.load(Ordering::Acquire);
+
         // println!("RingBuffer: in_use:{in_use}/head:{head}/tail:{tail}");
         if in_use == head {
             return Err(AppendError::NoBufferReady);
         }
 
-        let new_in_use = (in_use + 1) & self.mask;
         // println!("Ringbuffer: giving buffer {in_use}");
         match self.in_use.compare_exchange_weak(
             in_use,
-            new_in_use,
+            in_use+1,
             Ordering::AcqRel,
             Ordering::Acquire,
         ) {
             Ok(_) => {
                 // Successfully moved to next buffer, retry append
-                Ok(&self.buffer[in_use])
+                Ok(&self.buffer[in_use & self.mask])
             }
             Err(_) => {
                 // Another thread moved head, retry with new head
