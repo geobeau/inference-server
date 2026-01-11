@@ -8,7 +8,8 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.47.0", features = ["full"] }
 criterion = "0.5.1"
-ort = { version = "2.0.0-rc.10", features = ["download-binaries"] }
+ort = { version = "2.0.0-rc.10", features = [ "cuda"] }
+ort-sys = { version = "=2.0.0-rc.10", default-features = false }
 rand = "0.9.1"
 futures = "0.3.31"
 # S3 SDK crate (see section below for choice)
@@ -21,7 +22,7 @@ tonic-build = "0.14"
 prost = "0.14"
 prost-types = "0.14"
 tower-http = { version = "0.5", features = ["trace"] }
-tower = "0.5.2"
+tower ={ version = "0.5.2", features = ["limit"] }
 http = "1.3.1"
 # console-subscriber = "0.4.1"
 num-traits = "0.2.19"

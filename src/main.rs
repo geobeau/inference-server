@@ -5,6 +5,7 @@ mod tensor;
 mod tracing;
 use arc_swap::ArcSwap;
 use log::info;
+use tower::limit::ConcurrencyLimitLayer;
 use std::{collections::HashMap, sync::Arc};
 use tonic::transport::Server;
 
@@ -49,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .with_execution_providers([cuda_provider])
             .unwrap()
-            .with_intra_threads(4)
+            .with_intra_threads(2)
             .unwrap()
             .with_log_level(ort::logging::LogLevel::Verbose)
             .unwrap()
@@ -228,15 +229,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Starting Triton gRPC server on {}", addr);
     let svc = GrpcInferenceServiceServer::new(service).max_decoding_message_size(128 * 1024 * 1024);
+    let layer = ConcurrencyLimitLayer::new(64 * 64);
+
     Server::builder()
-        // .layer(
-        //     ServiceBuilder::new().layer(TraceLayer::new_for_grpc().make_span_with(
-        //         |request: &Request<_>| {
-        //             println!("Received request: {:?}", request);
-        //             tracing::info_span!("grpc_request")
-        //         },
-        //     )),
-        // )
+        .layer(layer)
         .add_service(svc)
         .serve(addr)
         .await?;
