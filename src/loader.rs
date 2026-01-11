@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ort::session::Session;
+use ort::session::{RunOptions, Session};
 
 use crate::{scheduler::ModelProxy, tensor::batched_tensor::BatchedOutputs};
 
@@ -15,15 +15,16 @@ impl OnnxExecutor {
         println!("executor started");
 
         loop {
-            println!("trying to execute another batch");
+            // println!("trying to execute another batch");
             self.model
                 .data
-                .execute_on_batch(|inputs| {
+                .execute_on_batch(async |inputs| {
+                    // let run_options: RunOptions = RunOptions::new().unwrap();
                     let session_outputs = self.session.run(inputs).unwrap();
                     BatchedOutputs::new(session_outputs)
                 })
                 .await;
-            println!("executed batch")
+            // println!("executed batch")
         }
     }
 }

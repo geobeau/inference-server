@@ -6,6 +6,7 @@ use std::cell::RefCell;
 #[cfg(not(feature = "loom"))]
 use std::cell::UnsafeCell;
 use std::cmp::min;
+use std::error::Error;
 use std::time::Duration;
 use tokio::time::{sleep_until, Instant};
 
@@ -145,19 +146,19 @@ impl WriteReservation<'_> {
             return true;
         }
         // If this is the first slot, need to keep track of the timeout
-        else if self.slot == 0 {
-            // println!("{} slot 0 waiting on notifier or timeout", self.tensor.id);
-            tokio::select! {
-                _ = sleep_until(Instant::now() + Duration::from_millis(2)) => {
-                    // println!("{} slot 0 buffer timeout", self.tensor.id);
-                    return true
-                },
-                _ = self.tensor.full_notifier.notified() => {
-                    // println!("{} slot 0 buffer notified", self.tensor.id);
-                    return false
-                }
-            }
-        }
+        // else if self.slot == 0 {
+        //     // println!("{} slot 0 waiting on notifier or timeout", self.tensor.id);
+        //     tokio::select! {
+        //         _ = sleep_until(Instant::now() + Duration::from_millis(2)) => {
+        //             // println!("{} slot 0 buffer timeout", self.tensor.id);
+        //             return true
+        //         },
+        //         _ = self.tensor.full_notifier.notified() => {
+        //             // println!("{} slot 0 buffer notified", self.tensor.id);
+        //             return false
+        //         }
+        //     }
+        // }
 
         false
     }
@@ -182,19 +183,19 @@ impl<'a> Drop for WriteReservation<'a> {
 }
 
 pub struct Trace {
-    pub batch_first_open: std::time::Instant,
-    pub batch_complete: std::time::Duration,
-    batch_inference_start: std::time::Duration,
-    batch_inference_done: std::time::Duration,
-    batch_released: std::time::Duration,
+    pub batch_first_open: RefCell<std::time::Instant>,
+    pub batch_complete: RefCell<std::time::Duration>,
+    batch_inference_start: RefCell<std::time::Duration>,
+    batch_inference_done: RefCell<std::time::Duration>,
+    batch_released: RefCell<std::time::Duration>,
 }
 impl Trace {
     fn print_debug(&self) {
-        println!("time to complete batch {:?}\n picked by executor {:?}\n inference duration {:?}\n time to gather output {:?}", 
-            self.batch_complete,
-            self.batch_inference_start - self.batch_complete,
-            self.batch_inference_done - self.batch_inference_start,
-            self.batch_released - self.batch_inference_done,
+        println!("---\ntime to complete batch {:?}\n picked by executor {:?}\n inference duration {:?}\n time to gather output {:?}", 
+            self.batch_complete.borrow(),
+            *self.batch_inference_start.borrow() - *self.batch_complete.borrow(),
+            *self.batch_inference_done.borrow() - *self.batch_inference_start.borrow(),
+            *self.batch_released.borrow() - *self.batch_inference_done.borrow(),
         )
     }
 }
@@ -211,7 +212,7 @@ pub struct TensorBatch {
     written_slots: AtomicUsize,
     pub state: BatchState,
     full_notifier: Notify,
-    pub trace: RefCell<Trace>,
+    pub trace: Trace,
 }
 
 unsafe impl Send for TensorBatch {}
@@ -244,12 +245,13 @@ impl TensorBatch {
                 ) {
                     Ok(_) => {
                         // println!("{} Buffer closed", self.id);
+                        let mut batch_complete = self.trace.batch_complete.borrow_mut();
+                        *batch_complete = self.trace.batch_first_open.borrow().elapsed();
+
                         if self.state.transition_to_written().is_none() {
                             continue;
                         }
 
-                        let mut trace = self.trace.borrow_mut();
-                        trace.batch_complete = trace.batch_first_open.elapsed();
                         return;
                     }
                     Err(_) => {
@@ -314,11 +316,11 @@ impl TensorBatch {
             });
 
             let trace = Trace {
-                batch_first_open: std::time::Instant::now(),
-                batch_complete: std::time::Duration::from_nanos(0),
-                batch_inference_start: std::time::Duration::from_nanos(0),
-                batch_inference_done: std::time::Duration::from_nanos(0),
-                batch_released: std::time::Duration::from_nanos(0),
+                batch_first_open: RefCell::from(std::time::Instant::now()),
+                batch_complete: RefCell::from(std::time::Duration::from_nanos(0)),
+                batch_inference_start: RefCell::from(std::time::Duration::from_nanos(0)),
+                batch_inference_done: RefCell::from(std::time::Duration::from_nanos(0)),
+                batch_released: RefCell::from(std::time::Duration::from_nanos(0)),
             };
 
             Ok(TensorBatch {
@@ -330,7 +332,7 @@ impl TensorBatch {
                 written_slots: AtomicUsize::new(0),
                 state: BatchState::new(id),
                 full_notifier: Notify::new(),
-                trace: RefCell::from(trace),
+                trace: trace,
             })
         }
     }
@@ -339,12 +341,12 @@ impl TensorBatch {
         &'a self,
         data: &HashMap<String, DynTensor>,
         ring_buffer: &'a BatchRingBuffer,
-    ) -> Option<WriteReservation<'a>> {
+    ) -> Result<WriteReservation<'a>, usize> {
         let slot = self.append(data)?;
 
         // Mark this slot as written
         let reserved_slot = self.reserve_write_slot(slot, ring_buffer);
-        Some(reserved_slot)
+        Ok(reserved_slot)
     }
 
     pub async fn get_data_from_slot(
@@ -367,17 +369,15 @@ impl TensorBatch {
         }
     }
 
-    pub fn append(&self, data: &HashMap<String, DynTensor>) -> Option<usize> {
+    pub fn append(&self, data: &HashMap<String, DynTensor>) -> Result<usize, usize> {
         let slot = self.reserved_slots.fetch_add(1, Ordering::SeqCst);
         if slot >= self.batch_size {
             // println!("{} Full {slot}/{}", self.id, self.batch_size);
-            if slot > self.batch_size * 20 {
-                panic!("Buffer super full, probable deadlock")
-            }
-            return None;
+
+            return Err(slot);
         }
         if slot == 0 {
-            self.trace.borrow_mut().batch_first_open = std::time::Instant::now()
+            *self.trace.batch_first_open.borrow_mut() = std::time::Instant::now()
         }
 
         data.iter().for_each(|(key, value)| {
@@ -399,24 +399,24 @@ impl TensorBatch {
 
         fence(Ordering::Release);
 
-        Some(slot)
+        Ok(slot)
     }
 
     pub async fn execute_on_batch<F>(&self, f: F)
     where
-        F: FnOnce(HashMap<String, ValueRef<'_, DynTensorValueType>>) -> BatchedOutputs,
+        F: AsyncFnOnce(HashMap<String, ValueRef<'_, DynTensorValueType>>) -> BatchedOutputs,
     {
         // println!("{} Executor: data ready", self.id);
         let input = self.get_data_view().await;
-        let mut trace = self.trace.borrow_mut();
-        trace.batch_inference_start = trace.batch_first_open.elapsed();
+        *self.trace.batch_inference_start.borrow_mut() = self.trace.batch_first_open.borrow().elapsed();
         unsafe {
+            let result = Some(f(input).await);
             let ptr = self.output_data.get();
             // println!("{} Executor: execute", self.id);
-            *ptr = Some(f(input));
+            *ptr = result;
         }
         fence(Ordering::Release);
-        trace.batch_inference_done = trace.batch_first_open.elapsed();
+        *self.trace.batch_inference_done.borrow_mut() = self.trace.batch_first_open.borrow().elapsed();
         self.state.transition_to_executed().unwrap();
         // println!("{} Executor: notifying that output is ready", self.id)
     }
@@ -450,9 +450,8 @@ impl TensorBatch {
         self.reserved_slots.store(0, Ordering::Release);
         self.written_slots.store(0, Ordering::Release);
         self.state.transition_to_ready_to_use().unwrap();
-        let mut trace = self.trace.borrow_mut();
-        trace.batch_released = trace.batch_first_open.elapsed();
-        trace.print_debug();
+        *self.trace.batch_released.borrow_mut() = self.trace.batch_first_open.borrow().elapsed();
+        self.trace.print_debug();
         self.state.transition_to_open().unwrap();
     }
 
