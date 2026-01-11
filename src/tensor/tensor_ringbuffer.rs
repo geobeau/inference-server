@@ -139,6 +139,7 @@ impl BatchRingBuffer {
                         // );
                         self.try_move_head(head).await;
                         // println!("{} slot {} Closing buffer", buffer_idx, reservation.slot);
+                        println!("Closing: {}", head);
                         buffer.close_for_write();
                     }
 
@@ -146,11 +147,12 @@ impl BatchRingBuffer {
                 }
                 Err(slot) => {
                     if slot > self.batch_size * 20 {
-                        panic!("Buffer super full, dumping useful data before panic: in flight executor {}\nTail:{}->Use:{}->Head:{}",
+                        panic!("Buffer super full, dumping useful data before panic: in flight executor {}\nTail:{}->Use:{}->Head:{}({})",
                             self.executor_in_flight.load(Ordering::Relaxed),
                             self.tail.load(Ordering::Relaxed),
                             self.in_use.load(Ordering::Relaxed),
                             self.head.load(Ordering::Relaxed),
+                            head & self.mask
                         )
                     }
                     // Buffer is full, try to move to next
