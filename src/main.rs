@@ -10,7 +10,7 @@ use tonic::transport::Server;
 use tower::limit::ConcurrencyLimitLayer;
 
 use ort::{
-    environment::{EnvironmentBuilder, GlobalThreadPoolOptions}, execution_providers::{CPUExecutionProvider, CUDAExecutionProvider, OpenVINOExecutionProvider}, session::{Session, builder::GraphOptimizationLevel}
+    environment::{EnvironmentBuilder, GlobalThreadPoolOptions}, execution_providers::{CPUExecutionProvider, CUDAExecutionProvider, OpenVINOExecutionProvider}, memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType}, session::{Session, builder::GraphOptimizationLevel}
 };
 
 use crate::{
@@ -23,10 +23,12 @@ use crate::{
         TritonService,
     },
     scheduler::ModelMetadata,
-    tensor::{supertensor::SuperTensorBuffer, tensor_ringbuffer::BatchRingBuffer},
+    tensor::{supertensor::SuperTensorBuffer},
 };
 
-#[tokio::main]
+// Current worker that I use is 16 vcpu: 12 is for tokio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
+// TODO: make this configurable
+#[tokio::main(flavor = "multi_thread", worker_threads = 12)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // console_subscriber::init();
     let addr = "0.0.0.0:8001".parse()?; // Triton default gRPC port is 8001
@@ -56,9 +58,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if i == 0 {
             let metadata = session.metadata().unwrap();
+            let allocator = Allocator::new(
+                &session,
+                MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
+            )?;
             let inputs = session.inputs.iter().collect();
             super_tensor_buffer =
-                Some(SuperTensorBuffer::new(capacity, batch_size as usize, &inputs).unwrap());
+                Some(SuperTensorBuffer::new(capacity, batch_size as usize, &inputs, &allocator).unwrap());
+
+
 
             let inputs = session
                 .inputs
