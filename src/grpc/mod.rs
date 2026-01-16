@@ -3,6 +3,7 @@ pub mod inference;
 
 use std::ops::Deref;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 use std::{collections::HashMap, vec};
 
 use arc_swap::ArcSwap;
@@ -145,7 +146,7 @@ impl GrpcInferenceService for TritonService {
             .map(|(key, output)| {
                 let data_type = output.data_type();
 
-                let (shape, serial_data) = output.try_extract_tensor::<f64>().unwrap();
+                let (shape, serial_data) = output.try_extract_tensor::<f32>().unwrap();
                 let bytes: Vec<u8> = serial_data
                     .iter()
                     .flat_map(|value| value.to_le_bytes())
@@ -162,7 +163,7 @@ impl GrpcInferenceService for TritonService {
             })
             .collect();
 
-        println!("Request complete");
+        // println!("Request complete");
 
         Ok(Response::new(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),

@@ -103,7 +103,7 @@ impl BatchedTensor {
         }
     }
 
-    fn pop_at(&self, slot: usize) -> DynTensor {
+    pub fn pop_at(&self, slot: usize) -> DynTensor {
         let mut tensor = DynTensor::new(
             &Allocator::default(),
             self.data_type,

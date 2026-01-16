@@ -4,7 +4,7 @@ use ort::tensor::Shape;
 
 use crate::{
     grpc::inference::{model_metadata_response::TensorMetadata, ModelConfig},
-    tensor::tensor_ringbuffer::BatchRingBuffer,
+    tensor::{supertensor::SuperTensorBuffer, tensor_ringbuffer::BatchRingBuffer},
 };
 
 #[derive(Clone)]
@@ -15,7 +15,7 @@ pub struct ModelMetadata {
 }
 
 pub struct ModelProxy {
-    pub data: BatchRingBuffer,
+    pub data: SuperTensorBuffer,
     pub model_config: ModelConfig,
     pub model_metadata: ModelMetadata,
 }

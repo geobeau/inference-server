@@ -5,13 +5,12 @@ mod tensor;
 mod tracing;
 use arc_swap::ArcSwap;
 use log::info;
-use tower::limit::ConcurrencyLimitLayer;
 use std::{collections::HashMap, sync::Arc};
 use tonic::transport::Server;
+use tower::limit::ConcurrencyLimitLayer;
 
 use ort::{
-    execution_providers::{CPUExecutionProvider, CUDAExecutionProvider, OpenVINOExecutionProvider},
-    session::{builder::GraphOptimizationLevel, Session},
+    environment::{EnvironmentBuilder, GlobalThreadPoolOptions}, execution_providers::{CPUExecutionProvider, CUDAExecutionProvider, OpenVINOExecutionProvider}, session::{Session, builder::GraphOptimizationLevel}
 };
 
 use crate::{
@@ -24,7 +23,7 @@ use crate::{
         TritonService,
     },
     scheduler::ModelMetadata,
-    tensor::tensor_ringbuffer::BatchRingBuffer,
+    tensor::{supertensor::SuperTensorBuffer, tensor_ringbuffer::BatchRingBuffer},
 };
 
 #[tokio::main]
@@ -36,23 +35,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut model_config: Option<ModelConfig> = None;
     let mut model_metadata: Option<ModelMetadata> = None;
 
-    let mut ring_buffer: Option<BatchRingBuffer> = None;
+    let mut super_tensor_buffer: Option<SuperTensorBuffer> = None;
     let mut model_proxy: Option<Arc<scheduler::ModelProxy>> = None;
 
     let batch_size = 64;
-    for i in 0..8 {
-        let cuda_provider = CUDAExecutionProvider::default().build().error_on_failure();
+    let capacity = 64;
 
-        let _cpu_provider = CPUExecutionProvider::default().build();
+    let cuda_provider = CUDAExecutionProvider::default().build().error_on_failure();
+    let thread_pool =  GlobalThreadPoolOptions::default().with_intra_threads(5).unwrap().with_spin_control(true).unwrap();
+    ort::init().with_execution_providers([cuda_provider]).with_global_thread_pool(thread_pool).commit().unwrap();
+    // Cannot be more than the ring buffer size
+    for i in 0..8 {
         let session = Session::builder()
             .unwrap()
             .with_optimization_level(GraphOptimizationLevel::Level3)
-            .unwrap()
-            .with_execution_providers([cuda_provider])
-            .unwrap()
-            .with_intra_threads(2)
-            .unwrap()
-            .with_log_level(ort::logging::LogLevel::Verbose)
             .unwrap()
             .commit_from_file("samples/model.onnx")
             // .commit_from_file("samples/matmul.onnx")
@@ -61,7 +57,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if i == 0 {
             let metadata = session.metadata().unwrap();
             let inputs = session.inputs.iter().collect();
-            ring_buffer = Some(BatchRingBuffer::new(64, batch_size as usize, &inputs));
+            super_tensor_buffer =
+                Some(SuperTensorBuffer::new(capacity, batch_size as usize, &inputs).unwrap());
 
             let inputs = session
                 .inputs
@@ -204,7 +201,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
 
             model_proxy = Some(Arc::from(scheduler::ModelProxy {
-                data: ring_buffer.unwrap(),
+                data: super_tensor_buffer.unwrap(),
                 model_config: model_config.unwrap(),
                 model_metadata: model_metadata.unwrap(),
             }));
