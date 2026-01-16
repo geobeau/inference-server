@@ -7,6 +7,7 @@ use std::{
         Arc,
     },
     time::Duration,
+    usize,
 };
 
 use arc_swap::ArcSwap;
@@ -20,10 +21,9 @@ use tokio::{
     time::{sleep_until, Instant},
 };
 
-use crate::tensor::{
-    batched_inputs::{AppendError, BatchState},
-    batched_tensor::{BatchableTensor, BatchedOutputs},
-};
+use crate::tensor::batched_tensor::{BatchableTensor, BatchedOutputs};
+
+const HALF_RANGE: usize = usize::MAX / 2;
 
 pub struct Trace {
     pub batch_first_open: RefCell<std::time::Instant>,
@@ -62,7 +62,6 @@ pub struct WriteReservation<'a> {
     response_ready_notified: Notified<'a>,
     slot: usize,
 }
-
 
 static IN_FLIGHT_REQ: AtomicUsize = AtomicUsize::new(0);
 
@@ -107,12 +106,12 @@ fn is_power_of_two(n: usize) -> bool {
 pub struct RingBufferIndex<'a> {
     /// Absolute index on the ringbuffer
     index: usize,
-    ring_buffer: &'a SuperTensorBuffer,
+    atomic_ref: &'a PaddedAtomic,
 }
 
 impl<'a> RingBufferIndex<'a> {
-    fn new(index: usize, ring_buffer: &SuperTensorBuffer) -> RingBufferIndex {
-        return RingBufferIndex { index, ring_buffer };
+    fn new(index: usize, atomic_ref: &PaddedAtomic) -> RingBufferIndex {
+        return RingBufferIndex { index, atomic_ref };
     }
     /// Get the absolute index, return the raw index, useful for operating on the ring
     /// itself
@@ -123,7 +122,7 @@ impl<'a> RingBufferIndex<'a> {
     /// Return the batch_slot 0 of the next batch in absolute index
     fn as_absolute_batch_higher_bound(&self) -> usize {
         self.as_absolute_batch_lower_bound()
-            .wrapping_add(self.ring_buffer.batch_size)
+            .wrapping_add(self.atomic_ref.batch_size)
     }
     /// Return the batch_slot 0 of the current batch in absolute index
     fn as_absolute_batch_lower_bound(&self) -> usize {
@@ -133,26 +132,57 @@ impl<'a> RingBufferIndex<'a> {
     /// Get the batch id: the idx of the batch that is concerned by this index
     fn as_batch_id(&self) -> usize {
         // println!("{}: {} / {} -> {}", self.index , self.index & self.ring_buffer.ring_mask, self.ring_buffer.batch_size, (self.index & self.ring_buffer.ring_mask) / self.ring_buffer.batch_size);
-        (self.index & self.ring_buffer.ring_mask) / self.ring_buffer.batch_size
+        (self.index & self.atomic_ref.ring_mask) / self.atomic_ref.batch_size
     }
 
     /// Get the batch slot id: the idx of the slot relative to the batch id
     fn as_batch_slot_id(&self) -> usize {
-        self.index & self.ring_buffer.batch_mask
+        self.index & self.atomic_ref.batch_mask
+    }
+
+    pub fn wrapping_sub(&self, other: &RingBufferIndex) -> usize {
+        self.index.wrapping_sub(other.index)
+    }
+
+    pub fn wrapping_add(&self, rhs: usize) -> usize {
+        self.index.wrapping_add(rhs)
     }
 }
 
 unsafe impl Send for SuperTensorBuffer {}
 unsafe impl Sync for SuperTensorBuffer {}
 
+/// To avoid false sharing, padding the atomic with the worst case cache line
+/// This also helps operating safely around the heads/tail
+#[repr(align(128))]
+struct PaddedAtomic {
+    value: AtomicUsize,
+    // Mask for the full ring: batch_size * capacity
+    ring_mask: usize,
+    // Mask to get position within the batch
+    batch_mask: usize,
+    batch_size: usize,
+}
+
+impl PaddedAtomic {
+    pub fn load(&self, order: Ordering) -> RingBufferIndex {
+        RingBufferIndex::new(self.value.load(order), self)
+    }
+
+    pub fn compare_exchange_weak(&self, current: usize, new: usize) -> Result<usize, usize> {
+        self.value
+            .compare_exchange_weak(current, new, Ordering::SeqCst, Ordering::Relaxed)
+    }
+}
+
 pub struct SuperTensorBuffer {
     input_tensors: HashMap<String, Vec<UnsafeCell<BatchableTensor>>>,
     trackers: Vec<DataTracker>,
     batch_size: usize,
     capacity: usize,
-    head: AtomicUsize,
-    executor_head: AtomicUsize,
-    tail: AtomicUsize,
+    head: PaddedAtomic,
+    executor_head: PaddedAtomic,
+    tail: PaddedAtomic,
     // The mask is used for efficient modulo arithmetic to wrap around the ring buffer.
     // The Problem:
     // When you have a ring buffer with n buffers, you need to convert a continuously incrementing index (0, 1, 2, 3, 4, 5...) into a buffer position (0, 1, 2, 3, 0, 1, 2, 3...).
@@ -221,17 +251,34 @@ impl SuperTensorBuffer {
                     executor_notifier: ArcSwap::from(Arc::from(Notify::new())),
                 });
             }
+            let ring_mask = (capacity * batch_size) - 1;
+            let batch_mask = batch_size - 1;
 
             Ok(SuperTensorBuffer {
                 input_tensors,
                 trackers,
                 batch_size,
-                head: AtomicUsize::new(0),
-                executor_head: AtomicUsize::new(0),
-                tail: AtomicUsize::new(0),
+                head: PaddedAtomic {
+                    value: AtomicUsize::new(0),
+                    ring_mask,
+                    batch_mask,
+                    batch_size,
+                },
+                executor_head: PaddedAtomic {
+                    value: AtomicUsize::new(0),
+                    ring_mask,
+                    batch_mask,
+                    batch_size,
+                },
+                tail: PaddedAtomic {
+                    value: AtomicUsize::new(0),
+                    ring_mask,
+                    batch_mask,
+                    batch_size,
+                },
                 capacity,
-                ring_mask: (capacity * batch_size) - 1,
-                batch_mask: batch_size - 1,
+                ring_mask,
+                batch_mask,
                 executor_full_notifier: Notify::new(),
                 infer_full_notifier: Notify::new(),
             })
@@ -241,27 +288,24 @@ impl SuperTensorBuffer {
     pub async fn infer(
         &self,
         data: &HashMap<String, DynTensor>,
-    ) -> Result<HashMap<String, DynTensor>, AppendError> {
+    ) -> Result<HashMap<String, DynTensor>, usize> {
         loop {
             let current_head = self.head.load(Ordering::Relaxed);
             let current_tail = self.tail.load(Ordering::Acquire);
 
             // Check if the ring is full
-            if current_head.wrapping_sub(current_tail) >= self.capacity * self.batch_size {
+            if current_head.wrapping_sub(&current_tail) >= self.capacity * self.batch_size {
                 // println!("Buffer full, yielding");
                 self.infer_full_notifier.notified().await;
                 continue;
             }
 
             match self.head.compare_exchange_weak(
-                current_head,
-                current_head + 1,
-                Ordering::SeqCst,
-                Ordering::Relaxed,
+                current_head.as_absolute_index(),
+                current_head.wrapping_add(1),
             ) {
                 Ok(_) => {
-                    let reserved_idx = RingBufferIndex::new(current_head, self);
-                    let write_reservation = self.insert_tensors_at(reserved_idx, data);
+                    let write_reservation = self.insert_tensors_at(current_head, data);
                     return Ok(write_reservation.get_result().await);
                 }
                 Err(_) => {
@@ -316,74 +360,58 @@ impl SuperTensorBuffer {
     where
         F: AsyncFnOnce(HashMap<String, ValueRef<'_, DynTensorValueType>>) -> BatchedOutputs,
     {
-        let mut current_executor_head;
+        let mut current_executor_idx; // Defined as RingBufferIndex
         loop {
-            current_executor_head = self.executor_head.load(Ordering::Acquire);
+            current_executor_idx = self.executor_head.load(Ordering::Acquire);
             let current_tail = self.tail.load(Ordering::Acquire);
 
-            // Check if the ring is full
-            if current_executor_head.wrapping_sub(current_tail) >= self.capacity * self.batch_size {
-                // println!("Executor buffer full, yielding {id}");
+            // Check if the ring is full: (executor_head - tail) >= total_capacity
+            if current_executor_idx.wrapping_sub(&current_tail) >= self.capacity * self.batch_size {
                 self.executor_full_notifier.notified().await;
                 continue;
             }
 
-            // println!("Executor attempting to obtain {} -> {} {id}", current_executor_head, current_executor_head + self.batch_size);
-            
             match self.executor_head.compare_exchange_weak(
-                current_executor_head,
-                current_executor_head + self.batch_size,
-                Ordering::SeqCst,
-                Ordering::Relaxed,
+                current_executor_idx.as_absolute_index(),
+                current_executor_idx
+                    .as_absolute_index()
+                    .wrapping_add(self.batch_size),
             ) {
-                Ok(_) => {
-                    // println!("CAS sucess: {} -> {} ({id})", current_executor_head, current_executor_head + self.batch_size);
-                    break
-                }
-                Err(_) => {
-                    // Another executor won the race, retry the check
-                    continue;
-                }
+                Ok(_) => break,
+                Err(_) => continue,
             }
         }
-        
-        // Executor reserve their slots independently from the data slots
-        // We should ensure that the executors won't wrap around themselves
-        let current_executor_idx = RingBufferIndex::new(current_executor_head, &self);
-        // println!("{}> Executor Waiting -> {} ({id})", current_executor_idx.as_batch_id(), current_executor_head);
+
         let tracker = self
             .trackers
             .get(current_executor_idx.as_batch_id())
             .unwrap();
         tracker.executor_notifier.load().notified().await;
-        // println!("{}> Executor Notified ({id})", current_executor_idx.as_batch_id());
 
-        // It can be awaken for sleeping on deadline or full
-        // Prepare to be nofified later if full
         let notifier = tracker.executor_notifier.load();
         let notified_full = notifier.notified();
         let head = self.head.load(Ordering::Acquire);
-        if head < current_executor_idx.as_absolute_batch_higher_bound()
-        {
-            // Not full, waiting for deadline
+
+        // Wrapping safe: head < current_executor_idx.as_absolute_batch_higher_bound()
+        // Logic: Distance from head to higher_bound is > 0 and < HALF_RANGE
+        let dist_to_higher = current_executor_idx
+            .as_absolute_batch_higher_bound()
+            .wrapping_sub(head.as_absolute_index());
+        if dist_to_higher > 0 && dist_to_higher < HALF_RANGE {
             let maybe_deadline = tracker.deadline.load_full();
-            // println!("{}> Deadline: {maybe_deadline:?}, {head}, {}",current_executor_idx.as_batch_id(), current_executor_idx.as_absolute_batch_higher_bound());
-            let deadline = maybe_deadline.unwrap();
-            tokio::select! {
-                _ = sleep_until(deadline) => {},
-                _ = notified_full => {},
+            if let Some(deadline) = *maybe_deadline {
+                tokio::select! {
+                    _ = sleep_until(deadline) => {},
+                    _ = notified_full => {},
+                }
             }
         }
 
         self.seal_current_batch(tracker, &current_executor_idx);
-
-        // println!("{}> started exec, exec_head:{} ({id})", current_executor_idx.as_batch_id(), current_executor_idx.as_absolute_index());
         self.execute_current_batch(f, tracker, &current_executor_idx)
             .await;
-        // println!("{}> Finished exec, exec_head:{} ({id})", current_executor_idx.as_batch_id(), current_executor_idx.as_absolute_index());
         self.reset_batch(tracker);
         self.move_tail_to_next_non_dirty_buffer();
-        return;
     }
 
     async fn execute_current_batch<F>(
@@ -411,58 +439,44 @@ impl SuperTensorBuffer {
         // executor_notifier can be called twice, recreating one avoid keeping older permits
         tracker.executor_notifier.store(Arc::from(Notify::new()));
     }
-
     fn move_tail_to_next_non_dirty_buffer(&self) {
         loop {
-            let tail = RingBufferIndex::new(self.tail.load(Ordering::Acquire), &self);
+            let tail = self.tail.load(Ordering::Acquire);
             let head = self.head.load(Ordering::Acquire);
 
-            if tail.as_absolute_batch_higher_bound() >= head {
-                // Tail is at the level of the head
+            // Wrapping safe: tail.higher_bound >= head
+            if tail
+                .as_absolute_batch_higher_bound()
+                .wrapping_sub(head.as_absolute_index())
+                < HALF_RANGE
+            {
                 break;
             }
-            // println!(
-            //     "Tail> absolute:{}, batch_id:{}, slot_id:{}",
-            //     tail.as_absolute_index(),
-            //     tail.as_batch_id(),
-            //     tail.as_batch_slot_id()
-            // );
+
             let dirty_state = &self.trackers[tail.as_batch_id()].dirty;
             let dirty = dirty_state.load(Ordering::Acquire);
-            // println!("Tail> dirty: {dirty}");
             if dirty == 2 {
-                match dirty_state.compare_exchange_weak(
-                    dirty,
-                    0,
-                    Ordering::AcqRel,
-                    Ordering::Acquire,
-                ) {
-                    Ok(_) => {
-                        // println!("tail dirty to 0");
-                        match self.tail.compare_exchange_weak(
+                if dirty_state
+                    .compare_exchange_weak(dirty, 0, Ordering::AcqRel, Ordering::Acquire)
+                    .is_ok()
+                {
+                    if self
+                        .tail
+                        .compare_exchange_weak(
                             tail.as_absolute_index(),
                             tail.as_absolute_batch_higher_bound(),
-                            Ordering::AcqRel,
-                            Ordering::Acquire,
-                        ) {
-                            // if ok, loop again to process the next batch
-                            Ok(_) => {
-                                // println!("Tail moved -> {}", tail.as_absolute_batch_higher_bound());
-                                self.executor_full_notifier.notify_waiters();
-                                self.infer_full_notifier.notify_waiters();
-                                continue},
-                            // else, loop again to redo the loop, probably there contention with another executor
-                            Err(_) => continue,
-                        };
+                        )
+                        .is_ok()
+                    {
+                        self.executor_full_notifier.notify_waiters();
+                        self.infer_full_notifier.notify_waiters();
+                        continue;
                     }
-                    // There is another executor that already processed the tail
-                    Err(_) => break,
-                };
+                }
             }
             break;
         }
     }
-
     pub fn get_data_view(
         &self,
         current_executor_idx: &RingBufferIndex,
@@ -480,34 +494,36 @@ impl SuperTensorBuffer {
     }
 
     fn seal_current_batch(&self, tracker: &DataTracker, current_executor_idx: &RingBufferIndex) {
-        let mut remaining_open_slots ;
+        let mut remaining_open_slots;
         loop {
             remaining_open_slots = 0;
             let head = self.head.load(Ordering::Acquire);
-            let bid = current_executor_idx.as_batch_id();
-            // println!(
-            //     "{bid}> Sealing batch: head:{} < executor_higher:{}/lower:{}",
-            //     head,
-            //     current_executor_idx.as_absolute_batch_higher_bound(),
-            //     current_executor_idx.as_absolute_batch_lower_bound(),
-            // );
-            // TODO make the check wrapping safe
-            assert!(head >= current_executor_idx.as_absolute_batch_lower_bound(), "{bid}> Batch is being sealed but not even written yet");
-            if head < current_executor_idx.as_absolute_batch_higher_bound() {
-                // Batch is not full, fill it to prevent new usage
-                // TODO make the check wrapping safe
-                remaining_open_slots = current_executor_idx.as_absolute_batch_higher_bound() - head;
-                match self.head.compare_exchange_weak(
-                    head,
-                    head + remaining_open_slots,
-                    Ordering::AcqRel,
-                    Ordering::Acquire,
-                ) {
-                    Ok(_) => break,
-                    // If another slot was reserved, retry instantly. If there is enough
-                    // write to create CAS contention, it will be filled quickly anyway
-                    Err(_) => continue,
-                };
+
+            // head must be ahead of or equal to the lower bound of the batch we are sealing
+            assert!(
+                head.as_absolute_index()
+                    .wrapping_sub(current_executor_idx.as_absolute_batch_lower_bound())
+                    < HALF_RANGE,
+                "Batch is being sealed but not even written yet"
+            );
+
+            // Check if head is still within this batch: head < higher_bound
+            let dist_to_higher = current_executor_idx
+                .as_absolute_batch_higher_bound()
+                .wrapping_sub(head.as_absolute_index());
+            if dist_to_higher > 0 && dist_to_higher < HALF_RANGE {
+                remaining_open_slots = dist_to_higher;
+                if self
+                    .head
+                    .compare_exchange_weak(
+                        head.as_absolute_index(),
+                        head.as_absolute_index().wrapping_add(remaining_open_slots),
+                    )
+                    .is_ok()
+                {
+                    break;
+                }
+                continue;
             }
             break;
         }
@@ -524,7 +540,9 @@ impl SuperTensorBuffer {
             } else {
                 panic!(
                     "{}> written_slots ({}) is higher than expected_written_slots({})",
-                    current_executor_idx.as_batch_id(), written_slots, expected_written_slots
+                    current_executor_idx.as_batch_id(),
+                    written_slots,
+                    expected_written_slots
                 )
             }
         }
