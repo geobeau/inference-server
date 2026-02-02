@@ -20,7 +20,12 @@ impl OnnxExecutor {
                 .data
                 .execute_on_batch(self.id.clone(), async |inputs| {
                     let run_options: RunOptions = RunOptions::new().unwrap();
-                    let session_outputs = self.session.run_async(inputs, &run_options).unwrap().await.unwrap();
+                    let session_outputs = self
+                        .session
+                        .run_async(inputs, &run_options)
+                        .unwrap()
+                        .await
+                        .unwrap();
                     BatchedOutputs::new(session_outputs)
                 })
                 .await;

@@ -13,8 +13,7 @@ use std::{
 use arc_swap::ArcSwap;
 use futures::FutureExt;
 use ort::{
-    session::Input,
-    value::{DynTensor, DynTensorValueType, ValueRef},
+    memory::Allocator, value::{DynTensor, DynTensorValueType, Outlet, ValueRef}
 };
 use tokio::{
     sync::{futures::Notified, Notify, RwLock},
@@ -211,7 +210,8 @@ impl SuperTensorBuffer {
     pub fn new(
         capacity: usize,
         batch_size: usize,
-        inputs: &Vec<&Input>,
+        inputs: &Vec<&Outlet>,
+        allocator: &Allocator,
     ) -> Result<SuperTensorBuffer, ()> {
         {
             if !is_power_of_two(capacity) {
@@ -220,7 +220,7 @@ impl SuperTensorBuffer {
             let mut input_tensors = HashMap::new();
 
             inputs.iter().for_each(|input| {
-                let (ty, shape) = match &input.input_type {
+                let (ty, shape) = match &input.dtype() {
                     ort::value::ValueType::Tensor {
                         ty,
                         shape,
@@ -233,11 +233,11 @@ impl SuperTensorBuffer {
                 let mut batched_tensors = Vec::with_capacity(capacity);
                 for i in 0..capacity {
                     batched_tensors.push(UnsafeCell::from(BatchableTensor::new(
-                        *ty, shape, batch_size,
+                        ty.clone(), shape, batch_size, &Allocator::default(),
                     )));
                 }
 
-                input_tensors.insert(input.name.clone(), batched_tensors);
+                input_tensors.insert(input.name().to_string(), batched_tensors);
             });
 
             let mut trackers = Vec::with_capacity(capacity);

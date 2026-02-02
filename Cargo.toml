@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.47.0", features = ["full"] }
 criterion = "0.5.1"
-ort = { version = "2.0.0-rc.10", features = [ "cuda"] }
-ort-sys = { version = "=2.0.0-rc.10", default-features = false }
+ort = { version = "2.0.0-rc.11", features = [ "cuda"] }
+ort-sys = { version = "=2.0.0-rc.11", default-features = false }
 rand = "0.9.1"
 futures = "0.3.31"
 # S3 SDK crate (see section below for choice)
@@ -29,6 +29,7 @@ num-traits = "0.2.19"
 arc-swap = "1.7.1"
 bytemuck = "1.24.0"
 log = "0.4.28"
+tokio-hrtime = "0.1.6"
 
 [profile.dev]
 opt-level = 2

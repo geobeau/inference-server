@@ -4,7 +4,7 @@ use ort::tensor::Shape;
 
 use crate::{
     grpc::inference::{model_metadata_response::TensorMetadata, ModelConfig},
-    tensor::{supertensor::SuperTensorBuffer, tensor_ringbuffer::BatchRingBuffer},
+    tensor::supertensor::SuperTensorBuffer,
 };
 
 #[derive(Clone)]

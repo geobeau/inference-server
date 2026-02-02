@@ -10,7 +10,10 @@ use tonic::transport::Server;
 use tower::limit::ConcurrencyLimitLayer;
 
 use ort::{
-    environment::{EnvironmentBuilder, GlobalThreadPoolOptions}, execution_providers::{CPUExecutionProvider, CUDAExecutionProvider, OpenVINOExecutionProvider}, memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType}, session::{Session, builder::GraphOptimizationLevel}
+    environment::{EnvironmentBuilder, GlobalThreadPoolOptions},
+    execution_providers::{CPUExecutionProvider, CUDAExecutionProvider, OpenVINOExecutionProvider},
+    memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
+    session::{Session, builder::GraphOptimizationLevel}, value::Tensor,
 };
 
 use crate::{
@@ -23,7 +26,7 @@ use crate::{
         TritonService,
     },
     scheduler::ModelMetadata,
-    tensor::{supertensor::SuperTensorBuffer},
+    tensor::supertensor::SuperTensorBuffer,
 };
 
 // Current worker that I use is 16 vcpu: 12 is for tokio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
@@ -45,8 +48,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cuda_provider = CUDAExecutionProvider::default().build().error_on_failure();
     let thread_pool =  GlobalThreadPoolOptions::default().with_intra_threads(5).unwrap().with_spin_control(true).unwrap();
-    ort::init().with_execution_providers([cuda_provider]).with_global_thread_pool(thread_pool).commit().unwrap();
-    // Cannot be more than the ring buffer size
+    ort::init().with_execution_providers([cuda_provider]).with_global_thread_pool(thread_pool).commit();
+
+    let session = Session::builder()
+        .unwrap()
+        .with_optimization_level(GraphOptimizationLevel::Level3)
+        .unwrap()
+        .commit_from_file("samples/model.onnx")
+        .unwrap();
+
+    let allocator = Allocator::new(
+        &session,
+        MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
+    )?;
+
+    let mut data = Tensor::<f32>::new(&allocator, [1_usize, 1_usize]).unwrap();
+    let test = data.extract_tensor_mut();
+    println!("{test:?}");
+
     for i in 0..8 {
         let session = Session::builder()
             .unwrap()
@@ -56,25 +75,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // .commit_from_file("samples/matmul.onnx")
             .unwrap();
 
+        let allocator = Allocator::new(
+            &session,
+            MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
+        )?;
+
+        let mut data = Tensor::<f32>::new(&allocator, [1_usize, 1_usize]).unwrap();
+        let test = data.extract_tensor_mut();
+                    println!("{test:?}");
+
+
         if i == 0 {
             let metadata = session.metadata().unwrap();
             let allocator = Allocator::new(
                 &session,
-                MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
+                MemoryInfo::new(
+                    AllocationDevice::CUDA_PINNED,
+                    0,
+                    AllocatorType::Device,
+                    MemoryType::CPUInput,
+                )?,
             )?;
-            let inputs = session.inputs.iter().collect();
+            let inputs = session.inputs().iter().collect();
             super_tensor_buffer =
                 Some(SuperTensorBuffer::new(capacity, batch_size as usize, &inputs, &allocator).unwrap());
 
-
-
             let inputs = session
-                .inputs
+                .inputs()
                 .iter()
                 .map(|input| {
-                    let tensor_type: &DataType = &input.input_type.tensor_type().unwrap().into();
+                    let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
                     let tensor_shape: Vec<i64> = input
-                        .input_type
+                        .dtype()
                         .tensor_shape()
                         .unwrap()
                         .iter()
@@ -86,7 +118,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // println!("tensor dims {} {:?}", input.name.clone(), tensor_shape);
                     // let tensor_ = input.input_type
                     ModelInput {
-                        name: input.name.clone(),
+                        name: input.name().to_string(),
                         data_type: (*tensor_type).into(),
                         format: 0,
                         dims: tensor_shape,
@@ -100,12 +132,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect();
 
             let outputs = session
-                .outputs
+                .outputs()
                 .iter()
                 .map(|output| {
-                    let tensor_type: &DataType = &output.output_type.tensor_type().unwrap().into();
+                    let tensor_type: &DataType = &output.dtype().tensor_type().unwrap().into();
                     let tensor_shape: Vec<i64> = output
-                        .output_type
+                        .dtype()
                         .tensor_shape()
                         .unwrap()
                         .iter()
@@ -117,7 +149,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // println!("tensor dims {} {:?}", input.name.clone(), tensor_shape);
                     // let tensor_ = input.input_type
                     ModelOutput {
-                        name: output.name.clone(),
+                        name: output.name().to_string(),
                         data_type: (*tensor_type).into(),
                         dims: tensor_shape,
                         reshape: None,
@@ -130,12 +162,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let mut input_set = HashMap::new();
             let input_metadata = session
-                .inputs
+                .inputs()
                 .iter()
                 .map(|input| {
-                    let tensor_type: &DataType = &input.input_type.tensor_type().unwrap().into();
+                    let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
                     let tensor_shape: Vec<i64> = input
-                        .input_type
+                        .dtype()
                         .tensor_shape()
                         .unwrap()
                         .iter()
@@ -143,11 +175,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .collect();
                     // println!("tensor shape {} {:?}", input.name.clone(), tensor_shape);
                     // let tensor_ = input.input_type
-                    let mut input_shape = input.input_type.tensor_shape().unwrap().clone();
+                    let mut input_shape = input.dtype().tensor_shape().unwrap().clone();
                     input_shape[0] = 1;
-                    input_set.insert(input.name.clone(), input_shape);
+                    input_set.insert(input.name().to_string(), input_shape);
                     TensorMetadata {
-                        name: input.name.clone(),
+                        name: input.name().to_string(),
                         datatype: tensor_type.to_metadata_string(),
                         shape: tensor_shape,
                     }
@@ -155,12 +187,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect();
 
             let output_metadata = session
-                .outputs
+                .outputs()
                 .iter()
                 .map(|output| {
-                    let tensor_type: &DataType = &output.output_type.tensor_type().unwrap().into();
+                    let tensor_type: &DataType = &output.dtype().tensor_type().unwrap().into();
                     let tensor_shape: Vec<i64> = output
-                        .output_type
+                        .dtype()
                         .tensor_shape()
                         .unwrap()
                         .iter()
@@ -169,7 +201,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // println!("tensor shape {} {:?}", input.name.clone(), tensor_shape);
                     // let tensor_ = input.input_type
                     TensorMetadata {
-                        name: output.name.clone(),
+                        name: output.name().to_string(),
                         datatype: tensor_type.to_metadata_string(),
                         shape: tensor_shape,
                     }

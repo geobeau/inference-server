@@ -2,8 +2,8 @@ pub mod compat;
 pub mod inference;
 
 use std::ops::Deref;
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 use std::{collections::HashMap, vec};
 
 use arc_swap::ArcSwap;

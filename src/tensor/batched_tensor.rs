@@ -27,42 +27,42 @@ macro_rules! pop_tensor_slice {
     }};
 }
 
-pub struct BatchableInputs {
-    pub inputs: HashMap<String, BatchableTensor>,
-}
+// pub struct BatchableInputs {
+//     pub inputs: HashMap<String, BatchableTensor>,
+// }
 
-impl BatchableInputs {
-    pub fn new(inputs: &[Input], batch_size: usize) -> BatchableInputs {
-        let mut inner_inputs = HashMap::with_capacity(inputs.len());
-        inputs.iter().for_each(|input| {
-            let shape = input.input_type.tensor_shape().unwrap();
-            let data_type = input.input_type.tensor_type().unwrap();
-            inner_inputs.insert(
-                input.name.clone(),
-                BatchableTensor::new(data_type, shape, batch_size),
-            );
-        });
+// impl BatchableInputs {
+//     pub fn new(inputs: &[Input], batch_size: usize) -> BatchableInputs {
+//         let mut inner_inputs = HashMap::with_capacity(inputs.len());
+//         inputs.iter().for_each(|input| {
+//             let shape = input.input_type.tensor_shape().unwrap();
+//             let data_type = input.input_type.tensor_type().unwrap();
+//             inner_inputs.insert(
+//                 input.name.clone(),
+//                 BatchableTensor::new(data_type, shape, batch_size),
+//             );
+//         });
 
-        BatchableInputs {
-            inputs: inner_inputs,
-        }
-    }
+//         BatchableInputs {
+//             inputs: inner_inputs,
+//         }
+//     }
 
-    pub fn copy_at(&mut self, slot: usize, inputs: HashMap<String, DynTensor>) {
-        inputs.iter().for_each(|(name, tensor)| {
-            self.inputs.get_mut(name).unwrap().copy_at(slot, tensor);
-        });
-    }
+//     pub fn copy_at(&mut self, slot: usize, inputs: HashMap<String, DynTensor>) {
+//         inputs.iter().for_each(|(name, tensor)| {
+//             self.inputs.get_mut(name).unwrap().copy_at(slot, tensor);
+//         });
+//     }
 
-    pub fn session_inputs_view(&self) -> HashMap<String, ValueRef<'_, DynTensorValueType>> {
-        let mut all_inputs = HashMap::new();
+//     pub fn session_inputs_view(&self) -> HashMap<String, ValueRef<'_, DynTensorValueType>> {
+//         let mut all_inputs = HashMap::new();
 
-        self.inputs.iter().for_each(|(name, batch_tensor)| {
-            all_inputs.insert(name.clone(), batch_tensor.inner_tensor.view());
-        });
-        all_inputs
-    }
-}
+//         self.inputs.iter().for_each(|(name, batch_tensor)| {
+//             all_inputs.insert(name.clone(), batch_tensor.inner_tensor.view());
+//         });
+//         all_inputs
+//     }
+// }
 
 pub struct BatchedOutputs {
     pub outputs: HashMap<String, BatchedTensor>,
@@ -164,12 +164,12 @@ impl BatchedTensor {
 }
 
 impl BatchableTensor {
-    pub fn new(data_type: TensorElementType, shape: &Shape, batch_size: usize) -> BatchableTensor {
+    pub fn new(data_type: TensorElementType, shape: &Shape, batch_size: usize, allocator: &Allocator) -> BatchableTensor {
         assert_eq!(shape[0], -1, "Shape is not dynamic");
         let mut batch_shape = shape.clone();
         batch_shape[0] = batch_size as i64;
         BatchableTensor {
-            inner_tensor: DynTensor::new(&Allocator::default(), data_type, batch_shape).unwrap(),
+            inner_tensor: DynTensor::new(allocator, data_type, batch_shape).unwrap(),
             data_type,
         }
     }
@@ -231,7 +231,7 @@ use std::collections::HashMap;
 
 use ort::{
     memory::Allocator,
-    session::{Input, SessionOutputs},
+    session::{SessionOutputs},
     tensor::{Shape, TensorElementType},
     value::{DynTensor, DynTensorValueType, DynValue, Tensor, ValueRef},
 };
