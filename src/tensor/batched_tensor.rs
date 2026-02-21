@@ -231,9 +231,8 @@ use std::collections::HashMap;
 
 use ort::{
     memory::Allocator,
-    session::{SessionOutputs},
-    tensor::{Shape, TensorElementType},
-    value::{DynTensor, DynTensorValueType, DynValue, Tensor, ValueRef},
+    session::SessionOutputs,
+    value::{DynTensor, DynTensorValueType, DynValue, Shape, Tensor, TensorElementType, ValueRef},
 };
 
 use crate::grpc::inference::DataType;

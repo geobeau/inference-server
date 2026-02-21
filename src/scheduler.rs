@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ort::tensor::Shape;
+use ort::value::Shape;
 
 use crate::{
     grpc::inference::{model_metadata_response::TensorMetadata, ModelConfig},

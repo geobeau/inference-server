@@ -34,7 +34,7 @@ pub mod model_rate_limiter {
     /// @@
     /// @@     The resource property.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Resource {
         /// @@  .. cpp:var:: string name
         /// @@
@@ -71,7 +71,7 @@ pub struct ModelInstanceGroup {
     /// @@  .. cpp:var:: string name
     /// @@
     /// @@     Optional name of this group of instances. If not specified the
-    /// @@     name will be formed as <model name>\_<group number>. The name of
+    /// @@     name will be formed as <model name>_<group number>. The name of
     /// @@     individual instances will be further formed by a unique instance
     /// @@     number and GPU index:
     /// @@
@@ -145,7 +145,7 @@ pub struct ModelInstanceGroup {
     /// @@     The host policy name that the instance to be associated with.
     /// @@     The default value is set to reflect the device kind of the instance,
     /// @@     for instance, KIND_CPU is "cpu", KIND_MODEL is "model" and
-    /// @@     KIND_GPU is "gpu\_\<gpu_id>".
+    /// @@     KIND_GPU is "gpu_<gpu_id>".
     /// @@
     #[prost(string, tag = "9")]
     pub host_policy: ::prost::alloc::string::String,
@@ -157,7 +157,7 @@ pub mod model_instance_group {
     /// @@
     /// @@     A secondary device required for a model instance.
     /// @@
-    #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct SecondaryDevice {
         /// @@  .. cpp:var:: SecondaryDeviceKind kind
         /// @@
@@ -295,7 +295,7 @@ pub mod model_instance_group {
 /// @@
 /// @@   Reshape specification for input and output tensors.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModelTensorReshape {
     /// @@  .. cpp:var:: int64 shape (repeated)
     /// @@
@@ -309,7 +309,7 @@ pub struct ModelTensorReshape {
 /// @@
 /// @@   An input required by the model.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModelInput {
     /// @@  .. cpp:var:: string name
     /// @@
@@ -454,7 +454,7 @@ pub mod model_input {
 /// @@
 /// @@   An output produced by the model.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModelOutput {
     /// @@  .. cpp:var:: string name
     /// @@
@@ -514,7 +514,7 @@ pub struct ModelOutput {
 /// @@     A batch input is an additional input that must be added by
 /// @@     the backend based on all the requests in a batch.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BatchInput {
     /// @@    .. cpp:var:: Kind kind
     /// @@
@@ -605,7 +605,7 @@ pub mod batch_input {
         /// @@         \[batch_size, len(input_dim)\]. For example, if one
         /// @@         batch-2 input with shape \[3, 1\] and batch-1 input
         /// @@         with shape \[2, 2\] are batched, the batch input will
-        /// @@         have shape \[3, 2\] and value \[ \[3, 1\], \[3, 1\], \[2, 2\]\].
+        /// @@         have shape \[3, 2\] and value \[ [3, 1\], \[3, 1\], \[2, 2]\].
         /// @@
         BatchItemShape = 4,
         /// @@      .. cpp:enumerator:: Kind::BATCH_ITEM_SHAPE_FLATTEN = 5
@@ -661,7 +661,7 @@ pub mod batch_input {
 /// @@   A batch output is an output produced by the model that must be handled
 /// @@   differently by the backend based on all the requests in a batch.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BatchOutput {
     /// @@  .. cpp:var:: string target_name (repeated)
     /// @@
@@ -739,7 +739,7 @@ pub mod batch_output {
 /// @@   Policy indicating which versions of a model should be made
 /// @@   available by the inference server.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModelVersionPolicy {
     /// @@  .. cpp:var:: oneof policy_choice
     /// @@
@@ -756,7 +756,7 @@ pub mod model_version_policy {
     /// @@     Serve only the latest version(s) of a model. This is
     /// @@     the default policy.
     /// @@
-    #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct Latest {
         /// @@    .. cpp:var:: uint32 num_versions
         /// @@
@@ -772,13 +772,13 @@ pub mod model_version_policy {
     /// @@
     /// @@     Serve all versions of the model.
     /// @@
-    #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct All {}
     /// @@  .. cpp:var:: message Specific
     /// @@
     /// @@     Serve only specific versions of the model.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Specific {
         /// @@    .. cpp:var:: int64 versions (repeated)
         /// @@
@@ -792,7 +792,7 @@ pub mod model_version_policy {
     /// @@     Each model must implement only a single version policy. The
     /// @@     default policy is 'Latest'.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum PolicyChoice {
         /// @@    .. cpp:var:: Latest latest
         /// @@
@@ -905,7 +905,7 @@ pub mod model_optimization_policy {
     /// @@     to enabling all optimizations, -1 enables only basic optimizations,
     /// @@     +1 enables only basic and extended optimizations.
     /// @@
-    #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct Graph {
         /// @@    .. cpp:var:: int32 level
         /// @@
@@ -980,7 +980,7 @@ pub mod model_optimization_policy {
             /// @@
             #[prost(int32, tag = "1")]
             pub batch_size: i32,
-            /// @@      .. cpp:var:: map\<string, Shape> input
+            /// @@      .. cpp:var:: map<string, Shape> input
             /// @@
             /// @@         The specification of the inputs. 'Shape' is the shape of the
             /// @@         input without batching dimension.
@@ -1012,7 +1012,7 @@ pub mod model_optimization_policy {
             /// @@
             /// @@         Specification of tensor dimension.
             /// @@
-            #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+            #[derive(Clone, PartialEq, ::prost::Message)]
             pub struct Shape {
                 /// @@        .. cpp:var:: int64 dim (repeated)
                 /// @@
@@ -1031,7 +1031,7 @@ pub mod model_optimization_policy {
                 /// @@
                 #[prost(int32, tag = "1")]
                 pub batch_size: i32,
-                /// @@      .. cpp:var:: map\<string, Shape> input
+                /// @@      .. cpp:var:: map<string, Shape> input
                 /// @@
                 /// @@         The specification of the inputs. 'Shape' is the shape of
                 /// @@         the input without batching dimension.
@@ -1055,9 +1055,9 @@ pub mod model_optimization_policy {
     /// @@     accelerators by priority, the priority is determined based on the
     /// @@     order that they are set, i.e. the provider at the front has highest
     /// @@     priority. Overall, the priority will be in the following order:
-    /// @@         \<gpu_execution_accelerator> (if instance is on GPU)
+    /// @@         <gpu_execution_accelerator> (if instance is on GPU)
     /// @@         CUDA Execution Provider     (if instance is on GPU)
-    /// @@         \<cpu_execution_accelerator>
+    /// @@         <cpu_execution_accelerator>
     /// @@         Default CPU Execution Provider
     /// @@
     #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1134,7 +1134,7 @@ pub mod model_optimization_policy {
             /// @@
             #[prost(string, tag = "1")]
             pub name: ::prost::alloc::string::String,
-            /// @@    .. cpp:var:: map\<string, string> parameters
+            /// @@    .. cpp:var:: map<string, string> parameters
             /// @@
             /// @@       Additional parameters used to configure the accelerator.
             /// @@
@@ -1158,7 +1158,7 @@ pub mod model_optimization_policy {
     /// @@     memory, and from pinned memory to GPU memory. Similarly, pinned
     /// @@     memory will be used for delivering the outputs.
     /// @@
-    #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct PinnedMemoryBuffer {
         /// @@    .. cpp:var:: bool enable
         /// @@
@@ -1231,7 +1231,7 @@ pub mod model_optimization_policy {
 /// @@
 /// @@   Queue policy for inference requests.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct ModelQueuePolicy {
     /// @@
     /// @@  .. cpp:var:: TimeoutAction timeout_action
@@ -1391,7 +1391,7 @@ pub struct ModelDynamicBatching {
     /// @@
     #[prost(message, optional, tag = "6")]
     pub default_queue_policy: ::core::option::Option<ModelQueuePolicy>,
-    /// @@  .. cpp:var:: map\<uint64, ModelQueuePolicy> priority_queue_policy
+    /// @@  .. cpp:var:: map<uint64, ModelQueuePolicy> priority_queue_policy
     /// @@
     /// @@     Specify the queue policy for the priority level. The default queue
     /// @@     policy will be used if a priority level doesn't specify a queue
@@ -1618,7 +1618,7 @@ pub mod model_sequence_batching {
     /// @@
     /// @@     Settings used to initialize data for implicit state.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct InitialState {
         /// @@      .. cpp:var:: DataType data_type
         /// @@
@@ -1652,7 +1652,7 @@ pub mod model_sequence_batching {
         /// @@
         /// @@         Specify how the initial state data is generated.
         /// @@
-        #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
         pub enum StateData {
             /// @@
             /// @@      .. cpp:var:: bool zero_data
@@ -1789,7 +1789,7 @@ pub mod model_sequence_batching {
     /// @@     not guaranteed to be assigned to the same batch slot for
     /// @@     all inference requests of that sequence.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct StrategyOldest {
         /// @@    .. cpp:var:: int32 max_candidate_sequences
         /// @@
@@ -1901,7 +1901,7 @@ pub mod model_ensembling {
         /// @@
         #[prost(int64, tag = "2")]
         pub model_version: i64,
-        /// @@  .. cpp:var:: map\<string,string> input_map
+        /// @@  .. cpp:var:: map<string,string> input_map
         /// @@
         /// @@     Map from name of an input tensor on this step's model to ensemble
         /// @@     tensor name. The ensemble tensor must have the same data type and
@@ -1914,7 +1914,7 @@ pub mod model_ensembling {
             ::prost::alloc::string::String,
             ::prost::alloc::string::String,
         >,
-        /// @@  .. cpp:var:: map\<string,string> output_map
+        /// @@  .. cpp:var:: map<string,string> output_map
         /// @@
         /// @@     Map from name of an output tensor on this step's model to ensemble
         /// @@     tensor name. The data type and shape of the ensemble tensor will
@@ -1941,7 +1941,7 @@ pub mod model_ensembling {
 /// @@
 /// @@   A model parameter.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModelParameter {
     /// @@  .. cpp:var:: string string_value
     /// @@
@@ -1972,7 +1972,7 @@ pub struct ModelWarmup {
     /// @@
     #[prost(uint32, tag = "2")]
     pub batch_size: u32,
-    /// @@  .. cpp:var:: map\<string, Input> inputs
+    /// @@  .. cpp:var:: map<string, Input> inputs
     /// @@
     /// @@     The warmup meta data associated with every model input, including
     /// @@     control tensors.
@@ -2004,7 +2004,7 @@ pub mod model_warmup {
     /// @@
     /// @@     Meta data associated with an input.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Input {
         /// @@    .. cpp:var:: DataType data_type
         /// @@
@@ -2035,7 +2035,7 @@ pub mod model_warmup {
         /// @@       data type and 'random_data' is set, the data generation will fall
         /// @@       back to 'zero_data'.
         /// @@
-        #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
         pub enum InputDataType {
             /// @@
             /// @@    .. cpp:var:: bool zero_data
@@ -2074,7 +2074,7 @@ pub mod model_warmup {
 /// @@
 /// @@    The metadata of libraries providing custom operations for this model.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModelOperations {
     /// @@  .. cpp:var:: string op_library_filename (repeated)
     /// @@
@@ -2090,7 +2090,7 @@ pub struct ModelOperations {
 /// @@    The specification that describes the nature of transactions
 /// @@    to be expected from the model.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct ModelTransactionPolicy {
     /// @@  .. cpp:var:: bool decoupled
     /// @@
@@ -2137,7 +2137,7 @@ pub mod model_repository_agents {
         /// @@
         #[prost(string, tag = "1")]
         pub name: ::prost::alloc::string::String,
-        /// @@    .. cpp:var:: map\<string, string> parameters
+        /// @@    .. cpp:var:: map<string, string> parameters
         /// @@
         /// @@       The parameters for the agent.
         /// @@
@@ -2153,7 +2153,7 @@ pub mod model_repository_agents {
 /// @@
 /// @@   The response cache setting for the model.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct ModelResponseCache {
     /// @@
     /// @@  .. cpp::var:: bool enable
@@ -2214,7 +2214,7 @@ pub mod model_metrics {
         /// @@
         /// @@     Specify metrics to be overridden with metric_option.
         /// @@
-        #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+        #[derive(Clone, PartialEq, ::prost::Message)]
         pub struct MetricIdentifier {
             /// @@  .. cpp:var:: string family
             /// @@
@@ -2366,7 +2366,7 @@ pub struct ModelConfig {
     /// @@
     #[prost(string, tag = "8")]
     pub default_model_filename: ::prost::alloc::string::String,
-    /// @@  .. cpp:var:: map\<string,string> cc_model_filenames
+    /// @@  .. cpp:var:: map<string,string> cc_model_filenames
     /// @@
     /// @@     Optional map from CUDA compute capability to the filename of
     /// @@     the model that supports that compute capability. The filename
@@ -2377,7 +2377,7 @@ pub struct ModelConfig {
         ::prost::alloc::string::String,
         ::prost::alloc::string::String,
     >,
-    /// @@  .. cpp:var:: map\<string,string> metric_tags
+    /// @@  .. cpp:var:: map<string,string> metric_tags
     /// @@
     /// @@     Optional metric tags. User-specific key-value pairs for metrics
     /// @@     reported for this model. These tags are applied to the metrics
@@ -2388,7 +2388,7 @@ pub struct ModelConfig {
         ::prost::alloc::string::String,
         ::prost::alloc::string::String,
     >,
-    /// @@  .. cpp:var:: map\<string,ModelParameter> parameters
+    /// @@  .. cpp:var:: map<string,ModelParameter> parameters
     /// @@
     /// @@     Optional model parameters. User-specified parameter values.
     /// @@
@@ -2584,14 +2584,14 @@ impl DataType {
 /// @@
 /// @@   Request message for ServerLive.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct ServerLiveRequest {}
 /// @@
 /// @@.. cpp:var:: message ServerLiveResponse
 /// @@
 /// @@   Response message for ServerLive.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct ServerLiveResponse {
     /// @@
     /// @@  .. cpp:var:: bool live
@@ -2606,14 +2606,14 @@ pub struct ServerLiveResponse {
 /// @@
 /// @@   Request message for ServerReady.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct ServerReadyRequest {}
 /// @@
 /// @@.. cpp:var:: message ServerReadyResponse
 /// @@
 /// @@   Response message for ServerReady.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct ServerReadyResponse {
     /// @@
     /// @@  .. cpp:var:: bool ready
@@ -2628,7 +2628,7 @@ pub struct ServerReadyResponse {
 /// @@
 /// @@   Request message for ModelReady.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModelReadyRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -2650,7 +2650,7 @@ pub struct ModelReadyRequest {
 /// @@
 /// @@   Response message for ModelReady.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct ModelReadyResponse {
     /// @@
     /// @@  .. cpp:var:: bool ready
@@ -2665,14 +2665,14 @@ pub struct ModelReadyResponse {
 /// @@
 /// @@   Request message for ServerMetadata.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct ServerMetadataRequest {}
 /// @@
 /// @@.. cpp:var:: message ServerMetadataResponse
 /// @@
 /// @@   Response message for ServerMetadata.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ServerMetadataResponse {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -2701,7 +2701,7 @@ pub struct ServerMetadataResponse {
 /// @@
 /// @@   Request message for ModelMetadata.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModelMetadataRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -2769,7 +2769,7 @@ pub mod model_metadata_response {
     /// @@
     /// @@     Metadata for a tensor.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct TensorMetadata {
         /// @@
         /// @@    .. cpp:var:: string name
@@ -2972,7 +2972,7 @@ pub struct ModelInferRequest {
     /// @@
     #[prost(string, tag = "3")]
     pub id: ::prost::alloc::string::String,
-    /// @@  .. cpp:var:: map\<string,InferParameter> parameters
+    /// @@  .. cpp:var:: map<string,InferParameter> parameters
     /// @@
     /// @@     Optional inference parameters.
     /// @@
@@ -3055,7 +3055,7 @@ pub mod model_infer_request {
         /// @@
         #[prost(int64, repeated, tag = "3")]
         pub shape: ::prost::alloc::vec::Vec<i64>,
-        /// @@    .. cpp:var:: map\<string,InferParameter> parameters
+        /// @@    .. cpp:var:: map<string,InferParameter> parameters
         /// @@
         /// @@       Optional inference input tensor parameters.
         /// @@
@@ -3087,7 +3087,7 @@ pub mod model_infer_request {
         /// @@
         #[prost(string, tag = "1")]
         pub name: ::prost::alloc::string::String,
-        /// @@    .. cpp:var:: map\<string,InferParameter> parameters
+        /// @@    .. cpp:var:: map<string,InferParameter> parameters
         /// @@
         /// @@       Optional requested output tensor parameters.
         /// @@
@@ -3123,7 +3123,7 @@ pub struct ModelInferResponse {
     /// @@
     #[prost(string, tag = "3")]
     pub id: ::prost::alloc::string::String,
-    /// @@  .. cpp:var:: map\<string,InferParameter> parameters
+    /// @@  .. cpp:var:: map<string,InferParameter> parameters
     /// @@
     /// @@     Optional inference response parameters.
     /// @@
@@ -3195,7 +3195,7 @@ pub mod model_infer_response {
         /// @@
         #[prost(int64, repeated, tag = "3")]
         pub shape: ::prost::alloc::vec::Vec<i64>,
-        /// @@    .. cpp:var:: map\<string,InferParameter> parameters
+        /// @@    .. cpp:var:: map<string,InferParameter> parameters
         /// @@
         /// @@       Optional output tensor parameters.
         /// @@
@@ -3219,7 +3219,7 @@ pub mod model_infer_response {
 /// @@
 /// @@   Request message for ModelConfig.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModelConfigRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -3256,7 +3256,7 @@ pub struct ModelConfigResponse {
 /// @@
 /// @@   Request message for ModelStatistics.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModelStatisticsRequest {
     /// @@  .. cpp:var:: string name
     /// @@
@@ -3278,7 +3278,7 @@ pub struct ModelStatisticsRequest {
 /// @@
 /// @@   Statistic recording a cumulative duration metric.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct StatisticDuration {
     /// @@  .. cpp:var:: uint64 count
     /// @@
@@ -3298,7 +3298,7 @@ pub struct StatisticDuration {
 /// @@
 /// @@   Inference statistics.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct InferStatistics {
     /// @@  .. cpp:var:: StatisticDuration success
     /// @@
@@ -3395,7 +3395,7 @@ pub struct InferStatistics {
 /// @@
 /// @@   Statistics per response.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct InferResponseStatistics {
     /// @@  .. cpp:var:: StatisticDuration compute_infer
     /// @@
@@ -3441,7 +3441,7 @@ pub struct InferResponseStatistics {
 /// @@
 /// @@   Inference batch statistics.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct InferBatchStatistics {
     /// @@  .. cpp:var:: uint64 batch_size
     /// @@
@@ -3480,7 +3480,7 @@ pub struct InferBatchStatistics {
 /// @@
 /// @@   Memory usage.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MemoryUsage {
     /// @@  .. cpp:var:: string type
     /// @@
@@ -3585,7 +3585,7 @@ pub struct ModelStatistics {
     /// @@
     #[prost(message, repeated, tag = "8")]
     pub memory_usage: ::prost::alloc::vec::Vec<MemoryUsage>,
-    /// @@  .. cpp:var:: map\<string, InferResponseStatistics> response_stats
+    /// @@  .. cpp:var:: map<string, InferResponseStatistics> response_stats
     /// @@
     /// @@     The key and value pairs for all responses statistics. The key is a
     /// @@     string identifying a set of response statistics aggregated together
@@ -3617,7 +3617,7 @@ pub struct ModelStatisticsResponse {
 /// @@
 /// @@   An model repository parameter value.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModelRepositoryParameter {
     /// @@  .. cpp:var:: oneof parameter_choice
     /// @@
@@ -3636,7 +3636,7 @@ pub mod model_repository_parameter {
     /// @@     The parameter value can be a string, an int64 or
     /// @@     a boolean
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum ParameterChoice {
         /// @@    .. cpp:var:: bool bool_param
         /// @@
@@ -3669,7 +3669,7 @@ pub mod model_repository_parameter {
 /// @@
 /// @@   Request message for RepositoryIndex.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RepositoryIndexRequest {
     /// @@  .. cpp:var:: string repository_name
     /// @@
@@ -3707,7 +3707,7 @@ pub mod repository_index_response {
     /// @@
     /// @@     Index entry for a model.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct ModelIndex {
         /// @@
         /// @@    .. cpp:var:: string name
@@ -3758,7 +3758,7 @@ pub struct RepositoryModelLoadRequest {
     /// @@
     #[prost(string, tag = "2")]
     pub model_name: ::prost::alloc::string::String,
-    /// @@  .. cpp:var:: map\<string,ModelRepositoryParameter> parameters
+    /// @@  .. cpp:var:: map<string,ModelRepositoryParameter> parameters
     /// @@
     /// @@     Optional model repository request parameters.
     /// @@
@@ -3773,7 +3773,7 @@ pub struct RepositoryModelLoadRequest {
 /// @@
 /// @@   Response message for RepositoryModelLoad.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct RepositoryModelLoadResponse {}
 /// @@
 /// @@.. cpp:var:: message RepositoryModelUnloadRequest
@@ -3795,7 +3795,7 @@ pub struct RepositoryModelUnloadRequest {
     /// @@
     #[prost(string, tag = "2")]
     pub model_name: ::prost::alloc::string::String,
-    /// @@  .. cpp:var:: map\<string,ModelRepositoryParameter> parameters
+    /// @@  .. cpp:var:: map<string,ModelRepositoryParameter> parameters
     /// @@
     /// @@     Optional model repository request parameters.
     /// @@
@@ -3810,14 +3810,14 @@ pub struct RepositoryModelUnloadRequest {
 /// @@
 /// @@   Response message for RepositoryModelUnload.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct RepositoryModelUnloadResponse {}
 /// @@
 /// @@.. cpp:var:: message SystemSharedMemoryStatusRequest
 /// @@
 /// @@   Request message for SystemSharedMemoryStatus.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SystemSharedMemoryStatusRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -3836,7 +3836,7 @@ pub struct SystemSharedMemoryStatusRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SystemSharedMemoryStatusResponse {
     /// @@
-    /// @@  .. cpp:var:: map\<string,RegionStatus> regions
+    /// @@  .. cpp:var:: map<string,RegionStatus> regions
     /// @@
     /// @@     Status for each of the registered regions, indexed by
     /// @@     region name.
@@ -3854,7 +3854,7 @@ pub mod system_shared_memory_status_response {
     /// @@
     /// @@     Status for a shared memory region.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct RegionStatus {
         /// @@
         /// @@    .. cpp:var:: string name
@@ -3890,7 +3890,7 @@ pub mod system_shared_memory_status_response {
 /// @@
 /// @@   Request message for SystemSharedMemoryRegister.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SystemSharedMemoryRegisterRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -3925,14 +3925,14 @@ pub struct SystemSharedMemoryRegisterRequest {
 /// @@
 /// @@   Response message for SystemSharedMemoryRegister.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct SystemSharedMemoryRegisterResponse {}
 /// @@
 /// @@.. cpp:var:: message SystemSharedMemoryUnregisterRequest
 /// @@
 /// @@   Request message for SystemSharedMemoryUnregister.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SystemSharedMemoryUnregisterRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -3948,14 +3948,14 @@ pub struct SystemSharedMemoryUnregisterRequest {
 /// @@
 /// @@   Response message for SystemSharedMemoryUnregister.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct SystemSharedMemoryUnregisterResponse {}
 /// @@
 /// @@.. cpp:var:: message CudaSharedMemoryStatusRequest
 /// @@
 /// @@   Request message for CudaSharedMemoryStatus.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CudaSharedMemoryStatusRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -3974,7 +3974,7 @@ pub struct CudaSharedMemoryStatusRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CudaSharedMemoryStatusResponse {
     /// @@
-    /// @@  .. cpp:var:: map\<string,RegionStatus> regions
+    /// @@  .. cpp:var:: map<string,RegionStatus> regions
     /// @@
     /// @@     Status for each of the registered regions, indexed by
     /// @@     region name.
@@ -3992,7 +3992,7 @@ pub mod cuda_shared_memory_status_response {
     /// @@
     /// @@     Status for a shared memory region.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct RegionStatus {
         /// @@
         /// @@    .. cpp:var:: string name
@@ -4020,7 +4020,7 @@ pub mod cuda_shared_memory_status_response {
 /// @@
 /// @@   Request message for CudaSharedMemoryRegister.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CudaSharedMemoryRegisterRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -4053,14 +4053,14 @@ pub struct CudaSharedMemoryRegisterRequest {
 /// @@
 /// @@   Response message for CudaSharedMemoryRegister.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct CudaSharedMemoryRegisterResponse {}
 /// @@
 /// @@.. cpp:var:: message CudaSharedMemoryUnregisterRequest
 /// @@
 /// @@   Request message for CudaSharedMemoryUnregister.
 /// @@
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CudaSharedMemoryUnregisterRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -4076,7 +4076,7 @@ pub struct CudaSharedMemoryUnregisterRequest {
 /// @@
 /// @@   Response message for CudaSharedMemoryUnregister.
 /// @@
-#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct CudaSharedMemoryUnregisterResponse {}
 /// @@
 /// @@.. cpp:var:: message TraceSettingRequest
@@ -4085,7 +4085,7 @@ pub struct CudaSharedMemoryUnregisterResponse {}
 /// @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TraceSettingRequest {
-    /// @@  .. cpp:var:: map\<string,SettingValue> settings
+    /// @@  .. cpp:var:: map<string,SettingValue> settings
     /// @@
     /// @@     The new setting values to be updated,
     /// @@     settings that are not specified will remain unchanged.
@@ -4113,7 +4113,7 @@ pub mod trace_setting_request {
     /// @@     If no value is provided, the setting will be clear and
     /// @@     the global setting value will be used.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SettingValue {
         /// @@
         /// @@    .. cpp:var:: string value (repeated)
@@ -4131,7 +4131,7 @@ pub mod trace_setting_request {
 /// @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TraceSettingResponse {
-    /// @@  .. cpp:var:: map\<string,SettingValue> settings
+    /// @@  .. cpp:var:: map<string,SettingValue> settings
     /// @@
     /// @@     The current trace settings, including any changes specified
     /// @@     by TraceSettingRequest.
@@ -4149,7 +4149,7 @@ pub mod trace_setting_response {
     /// @@
     /// @@     The values to be associated with a trace setting.
     /// @@
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SettingValue {
         /// @@
         /// @@    .. cpp:var:: string value (repeated)
@@ -4167,7 +4167,7 @@ pub mod trace_setting_response {
 /// @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LogSettingsRequest {
-    /// @@  .. cpp:var:: map\<string,SettingValue> settings
+    /// @@  .. cpp:var:: map<string,SettingValue> settings
     /// @@
     /// @@     The current log settings.
     /// @@
@@ -4179,14 +4179,14 @@ pub struct LogSettingsRequest {
 }
 /// Nested message and enum types in `LogSettingsRequest`.
 pub mod log_settings_request {
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SettingValue {
         #[prost(oneof = "setting_value::ParameterChoice", tags = "1, 2, 3")]
         pub parameter_choice: ::core::option::Option<setting_value::ParameterChoice>,
     }
     /// Nested message and enum types in `SettingValue`.
     pub mod setting_value {
-        #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
         pub enum ParameterChoice {
             /// @@    .. cpp:var:: bool bool_param
             /// @@
@@ -4216,7 +4216,7 @@ pub mod log_settings_request {
 /// @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LogSettingsResponse {
-    /// @@  .. cpp:var:: map\<string,SettingValue> settings
+    /// @@  .. cpp:var:: map<string,SettingValue> settings
     /// @@
     /// @@     The current log settings.
     /// @@
@@ -4228,14 +4228,14 @@ pub struct LogSettingsResponse {
 }
 /// Nested message and enum types in `LogSettingsResponse`.
 pub mod log_settings_response {
-    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SettingValue {
         #[prost(oneof = "setting_value::ParameterChoice", tags = "1, 2, 3")]
         pub parameter_choice: ::core::option::Option<setting_value::ParameterChoice>,
     }
     /// Nested message and enum types in `SettingValue`.
     pub mod setting_value {
-        #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
         pub enum ParameterChoice {
             /// @@    .. cpp:var:: bool bool_param
             /// @@
@@ -4258,2018 +4258,232 @@ pub mod log_settings_response {
         }
     }
 }
-/// Generated client implementations.
-pub mod grpc_inference_service_client {
-    #![allow(
-        unused_variables,
-        dead_code,
-        missing_docs,
-        clippy::wildcard_imports,
-        clippy::let_unit_value,
-    )]
-    use tonic::codegen::*;
-    use tonic::codegen::http::Uri;
-    /// @@
-    /// @@.. cpp:var:: service InferenceService
-    /// @@
-    /// @@   Inference Server GRPC endpoints.
-    /// @@
-    #[derive(Debug, Clone)]
-    pub struct GrpcInferenceServiceClient<T> {
-        inner: tonic::client::Grpc<T>,
+#[async_trait::async_trait(?Send)]
+pub trait GrpcInferenceService {
+    async fn server_live(
+        &self,
+        req: ServerLiveRequest,
+    ) -> pajamax::Response<ServerLiveResponse>;
+    async fn server_ready(
+        &self,
+        req: ServerReadyRequest,
+    ) -> pajamax::Response<ServerReadyResponse>;
+    async fn model_ready(
+        &self,
+        req: ModelReadyRequest,
+    ) -> pajamax::Response<ModelReadyResponse>;
+    async fn server_metadata(
+        &self,
+        req: ServerMetadataRequest,
+    ) -> pajamax::Response<ServerMetadataResponse>;
+    async fn model_metadata(
+        &self,
+        req: ModelMetadataRequest,
+    ) -> pajamax::Response<ModelMetadataResponse>;
+    async fn model_infer(
+        &self,
+        req: ModelInferRequest,
+    ) -> pajamax::Response<ModelInferResponse>;
+    async fn model_config(
+        &self,
+        req: ModelConfigRequest,
+    ) -> pajamax::Response<ModelConfigResponse>;
+    async fn model_statistics(
+        &self,
+        req: ModelStatisticsRequest,
+    ) -> pajamax::Response<ModelStatisticsResponse>;
+    async fn repository_index(
+        &self,
+        req: RepositoryIndexRequest,
+    ) -> pajamax::Response<RepositoryIndexResponse>;
+    async fn repository_model_load(
+        &self,
+        req: RepositoryModelLoadRequest,
+    ) -> pajamax::Response<RepositoryModelLoadResponse>;
+    async fn repository_model_unload(
+        &self,
+        req: RepositoryModelUnloadRequest,
+    ) -> pajamax::Response<RepositoryModelUnloadResponse>;
+    async fn system_shared_memory_status(
+        &self,
+        req: SystemSharedMemoryStatusRequest,
+    ) -> pajamax::Response<SystemSharedMemoryStatusResponse>;
+    async fn system_shared_memory_register(
+        &self,
+        req: SystemSharedMemoryRegisterRequest,
+    ) -> pajamax::Response<SystemSharedMemoryRegisterResponse>;
+    async fn system_shared_memory_unregister(
+        &self,
+        req: SystemSharedMemoryUnregisterRequest,
+    ) -> pajamax::Response<SystemSharedMemoryUnregisterResponse>;
+    async fn cuda_shared_memory_status(
+        &self,
+        req: CudaSharedMemoryStatusRequest,
+    ) -> pajamax::Response<CudaSharedMemoryStatusResponse>;
+    async fn cuda_shared_memory_register(
+        &self,
+        req: CudaSharedMemoryRegisterRequest,
+    ) -> pajamax::Response<CudaSharedMemoryRegisterResponse>;
+    async fn cuda_shared_memory_unregister(
+        &self,
+        req: CudaSharedMemoryUnregisterRequest,
+    ) -> pajamax::Response<CudaSharedMemoryUnregisterResponse>;
+    async fn trace_setting(
+        &self,
+        req: TraceSettingRequest,
+    ) -> pajamax::Response<TraceSettingResponse>;
+    async fn log_settings(
+        &self,
+        req: LogSettingsRequest,
+    ) -> pajamax::Response<LogSettingsResponse>;
+}
+pub struct GrpcInferenceServiceServer<T: GrpcInferenceService>(T);
+#[allow(dead_code)]
+impl<T: GrpcInferenceService> GrpcInferenceServiceServer<T> {
+    pub fn new(inner: T) -> Self {
+        Self(inner)
     }
-    impl GrpcInferenceServiceClient<tonic::transport::Channel> {
-        /// Attempt to create a new client by connecting to a given endpoint.
-        pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
-        where
-            D: TryInto<tonic::transport::Endpoint>,
-            D::Error: Into<StdError>,
-        {
-            let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
-            Ok(Self::new(conn))
-        }
-    }
-    impl<T> GrpcInferenceServiceClient<T>
-    where
-        T: tonic::client::GrpcService<tonic::body::Body>,
-        T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
-    {
-        pub fn new(inner: T) -> Self {
-            let inner = tonic::client::Grpc::new(inner);
-            Self { inner }
-        }
-        pub fn with_origin(inner: T, origin: Uri) -> Self {
-            let inner = tonic::client::Grpc::with_origin(inner, origin);
-            Self { inner }
-        }
-        pub fn with_interceptor<F>(
-            inner: T,
-            interceptor: F,
-        ) -> GrpcInferenceServiceClient<InterceptedService<T, F>>
-        where
-            F: tonic::service::Interceptor,
-            T::ResponseBody: Default,
-            T: tonic::codegen::Service<
-                http::Request<tonic::body::Body>,
-                Response = http::Response<
-                    <T as tonic::client::GrpcService<tonic::body::Body>>::ResponseBody,
-                >,
-            >,
-            <T as tonic::codegen::Service<
-                http::Request<tonic::body::Body>,
-            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
-        {
-            GrpcInferenceServiceClient::new(InterceptedService::new(inner, interceptor))
-        }
-        /// Compress requests with the given encoding.
-        ///
-        /// This requires the server to support it otherwise it might respond with an
-        /// error.
-        #[must_use]
-        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
-            self.inner = self.inner.send_compressed(encoding);
-            self
-        }
-        /// Enable decompressing responses.
-        #[must_use]
-        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
-            self.inner = self.inner.accept_compressed(encoding);
-            self
-        }
-        /// Limits the maximum size of a decoded message.
-        ///
-        /// Default: `4MB`
-        #[must_use]
-        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
-            self.inner = self.inner.max_decoding_message_size(limit);
-            self
-        }
-        /// Limits the maximum size of an encoded message.
-        ///
-        /// Default: `usize::MAX`
-        #[must_use]
-        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
-            self.inner = self.inner.max_encoding_message_size(limit);
-            self
-        }
-        /// @@  .. cpp:var:: rpc ServerLive(ServerLiveRequest) returns
-        /// @@       (ServerLiveResponse)
-        /// @@
-        /// @@     Check liveness of the inference server.
-        /// @@
-        pub async fn server_live(
-            &mut self,
-            request: impl tonic::IntoRequest<super::ServerLiveRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ServerLiveResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/ServerLive",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("inference.GRPCInferenceService", "ServerLive"));
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc ServerReady(ServerReadyRequest) returns
-        /// @@       (ServerReadyResponse)
-        /// @@
-        /// @@     Check readiness of the inference server.
-        /// @@
-        pub async fn server_ready(
-            &mut self,
-            request: impl tonic::IntoRequest<super::ServerReadyRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ServerReadyResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/ServerReady",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("inference.GRPCInferenceService", "ServerReady"),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc ModelReady(ModelReadyRequest) returns
-        /// @@       (ModelReadyResponse)
-        /// @@
-        /// @@     Check readiness of a model in the inference server.
-        /// @@
-        pub async fn model_ready(
-            &mut self,
-            request: impl tonic::IntoRequest<super::ModelReadyRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ModelReadyResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/ModelReady",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("inference.GRPCInferenceService", "ModelReady"));
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc ServerMetadata(ServerMetadataRequest) returns
-        /// @@       (ServerMetadataResponse)
-        /// @@
-        /// @@     Get server metadata.
-        /// @@
-        pub async fn server_metadata(
-            &mut self,
-            request: impl tonic::IntoRequest<super::ServerMetadataRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ServerMetadataResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/ServerMetadata",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("inference.GRPCInferenceService", "ServerMetadata"),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc ModelMetadata(ModelMetadataRequest) returns
-        /// @@       (ModelMetadataResponse)
-        /// @@
-        /// @@     Get model metadata.
-        /// @@
-        pub async fn model_metadata(
-            &mut self,
-            request: impl tonic::IntoRequest<super::ModelMetadataRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ModelMetadataResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/ModelMetadata",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("inference.GRPCInferenceService", "ModelMetadata"),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc ModelInfer(ModelInferRequest) returns
-        /// @@       (ModelInferResponse)
-        /// @@
-        /// @@     Perform inference using a specific model.
-        /// @@
-        pub async fn model_infer(
-            &mut self,
-            request: impl tonic::IntoRequest<super::ModelInferRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ModelInferResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/ModelInfer",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("inference.GRPCInferenceService", "ModelInfer"));
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc ModelConfig(ModelConfigRequest) returns
-        /// @@       (ModelConfigResponse)
-        /// @@
-        /// @@     Get model configuration.
-        /// @@
-        pub async fn model_config(
-            &mut self,
-            request: impl tonic::IntoRequest<super::ModelConfigRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ModelConfigResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/ModelConfig",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("inference.GRPCInferenceService", "ModelConfig"),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc ModelStatistics(
-        /// @@                     ModelStatisticsRequest)
-        /// @@                   returns (ModelStatisticsResponse)
-        /// @@
-        /// @@     Get the cumulative inference statistics for a model.
-        /// @@
-        pub async fn model_statistics(
-            &mut self,
-            request: impl tonic::IntoRequest<super::ModelStatisticsRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ModelStatisticsResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/ModelStatistics",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("inference.GRPCInferenceService", "ModelStatistics"),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc RepositoryIndex(RepositoryIndexRequest) returns
-        /// @@       (RepositoryIndexResponse)
-        /// @@
-        /// @@     Get the index of model repository contents.
-        /// @@
-        pub async fn repository_index(
-            &mut self,
-            request: impl tonic::IntoRequest<super::RepositoryIndexRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::RepositoryIndexResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/RepositoryIndex",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("inference.GRPCInferenceService", "RepositoryIndex"),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc RepositoryModelLoad(RepositoryModelLoadRequest) returns
-        /// @@       (RepositoryModelLoadResponse)
-        /// @@
-        /// @@     Load or reload a model from a repository.
-        /// @@
-        pub async fn repository_model_load(
-            &mut self,
-            request: impl tonic::IntoRequest<super::RepositoryModelLoadRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::RepositoryModelLoadResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/RepositoryModelLoad",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "inference.GRPCInferenceService",
-                        "RepositoryModelLoad",
-                    ),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
-        /// @@       returns (RepositoryModelUnloadResponse)
-        /// @@
-        /// @@     Unload a model.
-        /// @@
-        pub async fn repository_model_unload(
-            &mut self,
-            request: impl tonic::IntoRequest<super::RepositoryModelUnloadRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::RepositoryModelUnloadResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/RepositoryModelUnload",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "inference.GRPCInferenceService",
-                        "RepositoryModelUnload",
-                    ),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc SystemSharedMemoryStatus(
-        /// @@                     SystemSharedMemoryStatusRequest)
-        /// @@                   returns (SystemSharedMemoryStatusRespose)
-        /// @@
-        /// @@     Get the status of all registered system-shared-memory regions.
-        /// @@
-        pub async fn system_shared_memory_status(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SystemSharedMemoryStatusRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::SystemSharedMemoryStatusResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/SystemSharedMemoryStatus",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "inference.GRPCInferenceService",
-                        "SystemSharedMemoryStatus",
-                    ),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc SystemSharedMemoryRegister(
-        /// @@                     SystemSharedMemoryRegisterRequest)
-        /// @@                   returns (SystemSharedMemoryRegisterResponse)
-        /// @@
-        /// @@     Register a system-shared-memory region.
-        /// @@
-        pub async fn system_shared_memory_register(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SystemSharedMemoryRegisterRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::SystemSharedMemoryRegisterResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/SystemSharedMemoryRegister",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "inference.GRPCInferenceService",
-                        "SystemSharedMemoryRegister",
-                    ),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc SystemSharedMemoryUnregister(
-        /// @@                     SystemSharedMemoryUnregisterRequest)
-        /// @@                   returns (SystemSharedMemoryUnregisterResponse)
-        /// @@
-        /// @@     Unregister a system-shared-memory region.
-        /// @@
-        pub async fn system_shared_memory_unregister(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SystemSharedMemoryUnregisterRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::SystemSharedMemoryUnregisterResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/SystemSharedMemoryUnregister",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "inference.GRPCInferenceService",
-                        "SystemSharedMemoryUnregister",
-                    ),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc CudaSharedMemoryStatus(
-        /// @@                     CudaSharedMemoryStatusRequest)
-        /// @@                   returns (CudaSharedMemoryStatusRespose)
-        /// @@
-        /// @@     Get the status of all registered CUDA-shared-memory regions.
-        /// @@
-        pub async fn cuda_shared_memory_status(
-            &mut self,
-            request: impl tonic::IntoRequest<super::CudaSharedMemoryStatusRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::CudaSharedMemoryStatusResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/CudaSharedMemoryStatus",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "inference.GRPCInferenceService",
-                        "CudaSharedMemoryStatus",
-                    ),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc CudaSharedMemoryRegister(
-        /// @@                     CudaSharedMemoryRegisterRequest)
-        /// @@                   returns (CudaSharedMemoryRegisterResponse)
-        /// @@
-        /// @@     Register a CUDA-shared-memory region.
-        /// @@
-        pub async fn cuda_shared_memory_register(
-            &mut self,
-            request: impl tonic::IntoRequest<super::CudaSharedMemoryRegisterRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::CudaSharedMemoryRegisterResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/CudaSharedMemoryRegister",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "inference.GRPCInferenceService",
-                        "CudaSharedMemoryRegister",
-                    ),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc CudaSharedMemoryUnregister(
-        /// @@                     CudaSharedMemoryUnregisterRequest)
-        /// @@                   returns (CudaSharedMemoryUnregisterResponse)
-        /// @@
-        /// @@     Unregister a CUDA-shared-memory region.
-        /// @@
-        pub async fn cuda_shared_memory_unregister(
-            &mut self,
-            request: impl tonic::IntoRequest<super::CudaSharedMemoryUnregisterRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::CudaSharedMemoryUnregisterResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/CudaSharedMemoryUnregister",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "inference.GRPCInferenceService",
-                        "CudaSharedMemoryUnregister",
-                    ),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc TraceSetting(TraceSettingRequest)
-        /// @@                   returns (TraceSettingResponse)
-        /// @@
-        /// @@     Update and get the trace setting of the Triton server.
-        /// @@
-        pub async fn trace_setting(
-            &mut self,
-            request: impl tonic::IntoRequest<super::TraceSettingRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::TraceSettingResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/TraceSetting",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("inference.GRPCInferenceService", "TraceSetting"),
-                );
-            self.inner.unary(req, path, codec).await
-        }
-        /// @@  .. cpp:var:: rpc LogSettings(LogSettingsRequest)
-        /// @@                   returns (LogSettingsResponse)
-        /// @@
-        /// @@     Update and get the log settings of the Triton server.
-        /// @@
-        pub async fn log_settings(
-            &mut self,
-            request: impl tonic::IntoRequest<super::LogSettingsRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::LogSettingsResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/inference.GRPCInferenceService/LogSettings",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("inference.GRPCInferenceService", "LogSettings"),
-                );
-            self.inner.unary(req, path, codec).await
-        }
+    pub fn inner(&self) -> &T {
+        &self.0
     }
 }
-/// Generated server implementations.
-pub mod grpc_inference_service_server {
-    #![allow(
-        unused_variables,
-        dead_code,
-        missing_docs,
-        clippy::wildcard_imports,
-        clippy::let_unit_value,
-    )]
-    use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with GrpcInferenceServiceServer.
-    #[async_trait]
-    pub trait GrpcInferenceService: std::marker::Send + std::marker::Sync + 'static {
-        /// @@  .. cpp:var:: rpc ServerLive(ServerLiveRequest) returns
-        /// @@       (ServerLiveResponse)
-        /// @@
-        /// @@     Check liveness of the inference server.
-        /// @@
-        async fn server_live(
-            &self,
-            request: tonic::Request<super::ServerLiveRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ServerLiveResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc ServerReady(ServerReadyRequest) returns
-        /// @@       (ServerReadyResponse)
-        /// @@
-        /// @@     Check readiness of the inference server.
-        /// @@
-        async fn server_ready(
-            &self,
-            request: tonic::Request<super::ServerReadyRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ServerReadyResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc ModelReady(ModelReadyRequest) returns
-        /// @@       (ModelReadyResponse)
-        /// @@
-        /// @@     Check readiness of a model in the inference server.
-        /// @@
-        async fn model_ready(
-            &self,
-            request: tonic::Request<super::ModelReadyRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ModelReadyResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc ServerMetadata(ServerMetadataRequest) returns
-        /// @@       (ServerMetadataResponse)
-        /// @@
-        /// @@     Get server metadata.
-        /// @@
-        async fn server_metadata(
-            &self,
-            request: tonic::Request<super::ServerMetadataRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ServerMetadataResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc ModelMetadata(ModelMetadataRequest) returns
-        /// @@       (ModelMetadataResponse)
-        /// @@
-        /// @@     Get model metadata.
-        /// @@
-        async fn model_metadata(
-            &self,
-            request: tonic::Request<super::ModelMetadataRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ModelMetadataResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc ModelInfer(ModelInferRequest) returns
-        /// @@       (ModelInferResponse)
-        /// @@
-        /// @@     Perform inference using a specific model.
-        /// @@
-        async fn model_infer(
-            &self,
-            request: tonic::Request<super::ModelInferRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ModelInferResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc ModelConfig(ModelConfigRequest) returns
-        /// @@       (ModelConfigResponse)
-        /// @@
-        /// @@     Get model configuration.
-        /// @@
-        async fn model_config(
-            &self,
-            request: tonic::Request<super::ModelConfigRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ModelConfigResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc ModelStatistics(
-        /// @@                     ModelStatisticsRequest)
-        /// @@                   returns (ModelStatisticsResponse)
-        /// @@
-        /// @@     Get the cumulative inference statistics for a model.
-        /// @@
-        async fn model_statistics(
-            &self,
-            request: tonic::Request<super::ModelStatisticsRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ModelStatisticsResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc RepositoryIndex(RepositoryIndexRequest) returns
-        /// @@       (RepositoryIndexResponse)
-        /// @@
-        /// @@     Get the index of model repository contents.
-        /// @@
-        async fn repository_index(
-            &self,
-            request: tonic::Request<super::RepositoryIndexRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::RepositoryIndexResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc RepositoryModelLoad(RepositoryModelLoadRequest) returns
-        /// @@       (RepositoryModelLoadResponse)
-        /// @@
-        /// @@     Load or reload a model from a repository.
-        /// @@
-        async fn repository_model_load(
-            &self,
-            request: tonic::Request<super::RepositoryModelLoadRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::RepositoryModelLoadResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
-        /// @@       returns (RepositoryModelUnloadResponse)
-        /// @@
-        /// @@     Unload a model.
-        /// @@
-        async fn repository_model_unload(
-            &self,
-            request: tonic::Request<super::RepositoryModelUnloadRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::RepositoryModelUnloadResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc SystemSharedMemoryStatus(
-        /// @@                     SystemSharedMemoryStatusRequest)
-        /// @@                   returns (SystemSharedMemoryStatusRespose)
-        /// @@
-        /// @@     Get the status of all registered system-shared-memory regions.
-        /// @@
-        async fn system_shared_memory_status(
-            &self,
-            request: tonic::Request<super::SystemSharedMemoryStatusRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::SystemSharedMemoryStatusResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc SystemSharedMemoryRegister(
-        /// @@                     SystemSharedMemoryRegisterRequest)
-        /// @@                   returns (SystemSharedMemoryRegisterResponse)
-        /// @@
-        /// @@     Register a system-shared-memory region.
-        /// @@
-        async fn system_shared_memory_register(
-            &self,
-            request: tonic::Request<super::SystemSharedMemoryRegisterRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::SystemSharedMemoryRegisterResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc SystemSharedMemoryUnregister(
-        /// @@                     SystemSharedMemoryUnregisterRequest)
-        /// @@                   returns (SystemSharedMemoryUnregisterResponse)
-        /// @@
-        /// @@     Unregister a system-shared-memory region.
-        /// @@
-        async fn system_shared_memory_unregister(
-            &self,
-            request: tonic::Request<super::SystemSharedMemoryUnregisterRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::SystemSharedMemoryUnregisterResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc CudaSharedMemoryStatus(
-        /// @@                     CudaSharedMemoryStatusRequest)
-        /// @@                   returns (CudaSharedMemoryStatusRespose)
-        /// @@
-        /// @@     Get the status of all registered CUDA-shared-memory regions.
-        /// @@
-        async fn cuda_shared_memory_status(
-            &self,
-            request: tonic::Request<super::CudaSharedMemoryStatusRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::CudaSharedMemoryStatusResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc CudaSharedMemoryRegister(
-        /// @@                     CudaSharedMemoryRegisterRequest)
-        /// @@                   returns (CudaSharedMemoryRegisterResponse)
-        /// @@
-        /// @@     Register a CUDA-shared-memory region.
-        /// @@
-        async fn cuda_shared_memory_register(
-            &self,
-            request: tonic::Request<super::CudaSharedMemoryRegisterRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::CudaSharedMemoryRegisterResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc CudaSharedMemoryUnregister(
-        /// @@                     CudaSharedMemoryUnregisterRequest)
-        /// @@                   returns (CudaSharedMemoryUnregisterResponse)
-        /// @@
-        /// @@     Unregister a CUDA-shared-memory region.
-        /// @@
-        async fn cuda_shared_memory_unregister(
-            &self,
-            request: tonic::Request<super::CudaSharedMemoryUnregisterRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::CudaSharedMemoryUnregisterResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc TraceSetting(TraceSettingRequest)
-        /// @@                   returns (TraceSettingResponse)
-        /// @@
-        /// @@     Update and get the trace setting of the Triton server.
-        /// @@
-        async fn trace_setting(
-            &self,
-            request: tonic::Request<super::TraceSettingRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::TraceSettingResponse>,
-            tonic::Status,
-        >;
-        /// @@  .. cpp:var:: rpc LogSettings(LogSettingsRequest)
-        /// @@                   returns (LogSettingsResponse)
-        /// @@
-        /// @@     Update and get the log settings of the Triton server.
-        /// @@
-        async fn log_settings(
-            &self,
-            request: tonic::Request<super::LogSettingsRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::LogSettingsResponse>,
-            tonic::Status,
-        >;
+#[async_trait::async_trait(?Send)]
+impl<T> pajamax::PajamaxService for GrpcInferenceServiceServer<T>
+where
+    T: GrpcInferenceService,
+{
+    fn is_dispatch_mode(&self) -> bool {
+        false
     }
-    /// @@
-    /// @@.. cpp:var:: service InferenceService
-    /// @@
-    /// @@   Inference Server GRPC endpoints.
-    /// @@
-    #[derive(Debug)]
-    pub struct GrpcInferenceServiceServer<T> {
-        inner: Arc<T>,
-        accept_compression_encodings: EnabledCompressionEncodings,
-        send_compression_encodings: EnabledCompressionEncodings,
-        max_decoding_message_size: Option<usize>,
-        max_encoding_message_size: Option<usize>,
-    }
-    impl<T> GrpcInferenceServiceServer<T> {
-        pub fn new(inner: T) -> Self {
-            Self::from_arc(Arc::new(inner))
+    fn route(&self, path: &[u8]) -> Option<usize> {
+        match path {
+            b"/inference.GRPCInferenceService/ServerLive" => Some(0),
+            b"/inference.GRPCInferenceService/ServerReady" => Some(1),
+            b"/inference.GRPCInferenceService/ModelReady" => Some(2),
+            b"/inference.GRPCInferenceService/ServerMetadata" => Some(3),
+            b"/inference.GRPCInferenceService/ModelMetadata" => Some(4),
+            b"/inference.GRPCInferenceService/ModelInfer" => Some(5),
+            b"/inference.GRPCInferenceService/ModelConfig" => Some(6),
+            b"/inference.GRPCInferenceService/ModelStatistics" => Some(7),
+            b"/inference.GRPCInferenceService/RepositoryIndex" => Some(8),
+            b"/inference.GRPCInferenceService/RepositoryModelLoad" => Some(9),
+            b"/inference.GRPCInferenceService/RepositoryModelUnload" => Some(10),
+            b"/inference.GRPCInferenceService/SystemSharedMemoryStatus" => Some(11),
+            b"/inference.GRPCInferenceService/SystemSharedMemoryRegister" => Some(12),
+            b"/inference.GRPCInferenceService/SystemSharedMemoryUnregister" => Some(13),
+            b"/inference.GRPCInferenceService/CudaSharedMemoryStatus" => Some(14),
+            b"/inference.GRPCInferenceService/CudaSharedMemoryRegister" => Some(15),
+            b"/inference.GRPCInferenceService/CudaSharedMemoryUnregister" => Some(16),
+            b"/inference.GRPCInferenceService/TraceSetting" => Some(17),
+            b"/inference.GRPCInferenceService/LogSettings" => Some(18),
+            _ => None,
         }
-        pub fn from_arc(inner: Arc<T>) -> Self {
-            Self {
-                inner,
-                accept_compression_encodings: Default::default(),
-                send_compression_encodings: Default::default(),
-                max_decoding_message_size: None,
-                max_encoding_message_size: None,
+    }
+    async fn handle(
+        &self,
+        req_disc: usize,
+        req_buf: &[u8],
+        stream_id: u32,
+        resp_tx: &pajamax::RespTx,
+    ) -> Result<(), pajamax::error::Error> {
+        use prost::Message;
+        match req_disc {
+            0 => {
+                let request = ServerLiveRequest::decode(req_buf)?;
+                let response = self.0.server_live(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
             }
-        }
-        pub fn with_interceptor<F>(
-            inner: T,
-            interceptor: F,
-        ) -> InterceptedService<Self, F>
-        where
-            F: tonic::service::Interceptor,
-        {
-            InterceptedService::new(Self::new(inner), interceptor)
-        }
-        /// Enable decompressing requests with the given encoding.
-        #[must_use]
-        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
-            self.accept_compression_encodings.enable(encoding);
-            self
-        }
-        /// Compress responses with the given encoding, if the client supports it.
-        #[must_use]
-        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
-            self.send_compression_encodings.enable(encoding);
-            self
-        }
-        /// Limits the maximum size of a decoded message.
-        ///
-        /// Default: `4MB`
-        #[must_use]
-        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
-            self.max_decoding_message_size = Some(limit);
-            self
-        }
-        /// Limits the maximum size of an encoded message.
-        ///
-        /// Default: `usize::MAX`
-        #[must_use]
-        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
-            self.max_encoding_message_size = Some(limit);
-            self
-        }
-    }
-    impl<T, B> tonic::codegen::Service<http::Request<B>>
-    for GrpcInferenceServiceServer<T>
-    where
-        T: GrpcInferenceService,
-        B: Body + std::marker::Send + 'static,
-        B::Error: Into<StdError> + std::marker::Send + 'static,
-    {
-        type Response = http::Response<tonic::body::Body>;
-        type Error = std::convert::Infallible;
-        type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(
-            &mut self,
-            _cx: &mut Context<'_>,
-        ) -> Poll<std::result::Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
-        fn call(&mut self, req: http::Request<B>) -> Self::Future {
-            match req.uri().path() {
-                "/inference.GRPCInferenceService/ServerLive" => {
-                    #[allow(non_camel_case_types)]
-                    struct ServerLiveSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::ServerLiveRequest>
-                    for ServerLiveSvc<T> {
-                        type Response = super::ServerLiveResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::ServerLiveRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::server_live(&inner, request)
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = ServerLiveSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/ServerReady" => {
-                    #[allow(non_camel_case_types)]
-                    struct ServerReadySvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::ServerReadyRequest>
-                    for ServerReadySvc<T> {
-                        type Response = super::ServerReadyResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::ServerReadyRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::server_ready(&inner, request)
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = ServerReadySvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/ModelReady" => {
-                    #[allow(non_camel_case_types)]
-                    struct ModelReadySvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::ModelReadyRequest>
-                    for ModelReadySvc<T> {
-                        type Response = super::ModelReadyResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::ModelReadyRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::model_ready(&inner, request)
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = ModelReadySvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/ServerMetadata" => {
-                    #[allow(non_camel_case_types)]
-                    struct ServerMetadataSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::ServerMetadataRequest>
-                    for ServerMetadataSvc<T> {
-                        type Response = super::ServerMetadataResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::ServerMetadataRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::server_metadata(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = ServerMetadataSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/ModelMetadata" => {
-                    #[allow(non_camel_case_types)]
-                    struct ModelMetadataSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::ModelMetadataRequest>
-                    for ModelMetadataSvc<T> {
-                        type Response = super::ModelMetadataResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::ModelMetadataRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::model_metadata(&inner, request)
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = ModelMetadataSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/ModelInfer" => {
-                    #[allow(non_camel_case_types)]
-                    struct ModelInferSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::ModelInferRequest>
-                    for ModelInferSvc<T> {
-                        type Response = super::ModelInferResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::ModelInferRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::model_infer(&inner, request)
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = ModelInferSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/ModelConfig" => {
-                    #[allow(non_camel_case_types)]
-                    struct ModelConfigSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::ModelConfigRequest>
-                    for ModelConfigSvc<T> {
-                        type Response = super::ModelConfigResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::ModelConfigRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::model_config(&inner, request)
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = ModelConfigSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/ModelStatistics" => {
-                    #[allow(non_camel_case_types)]
-                    struct ModelStatisticsSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::ModelStatisticsRequest>
-                    for ModelStatisticsSvc<T> {
-                        type Response = super::ModelStatisticsResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::ModelStatisticsRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::model_statistics(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = ModelStatisticsSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/RepositoryIndex" => {
-                    #[allow(non_camel_case_types)]
-                    struct RepositoryIndexSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::RepositoryIndexRequest>
-                    for RepositoryIndexSvc<T> {
-                        type Response = super::RepositoryIndexResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::RepositoryIndexRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::repository_index(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = RepositoryIndexSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/RepositoryModelLoad" => {
-                    #[allow(non_camel_case_types)]
-                    struct RepositoryModelLoadSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::RepositoryModelLoadRequest>
-                    for RepositoryModelLoadSvc<T> {
-                        type Response = super::RepositoryModelLoadResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::RepositoryModelLoadRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::repository_model_load(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = RepositoryModelLoadSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/RepositoryModelUnload" => {
-                    #[allow(non_camel_case_types)]
-                    struct RepositoryModelUnloadSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::RepositoryModelUnloadRequest>
-                    for RepositoryModelUnloadSvc<T> {
-                        type Response = super::RepositoryModelUnloadResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::RepositoryModelUnloadRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::repository_model_unload(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = RepositoryModelUnloadSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/SystemSharedMemoryStatus" => {
-                    #[allow(non_camel_case_types)]
-                    struct SystemSharedMemoryStatusSvc<T: GrpcInferenceService>(
-                        pub Arc<T>,
-                    );
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::SystemSharedMemoryStatusRequest>
-                    for SystemSharedMemoryStatusSvc<T> {
-                        type Response = super::SystemSharedMemoryStatusResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<
-                                super::SystemSharedMemoryStatusRequest,
-                            >,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::system_shared_memory_status(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = SystemSharedMemoryStatusSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/SystemSharedMemoryRegister" => {
-                    #[allow(non_camel_case_types)]
-                    struct SystemSharedMemoryRegisterSvc<T: GrpcInferenceService>(
-                        pub Arc<T>,
-                    );
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<
-                        super::SystemSharedMemoryRegisterRequest,
-                    > for SystemSharedMemoryRegisterSvc<T> {
-                        type Response = super::SystemSharedMemoryRegisterResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<
-                                super::SystemSharedMemoryRegisterRequest,
-                            >,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::system_shared_memory_register(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = SystemSharedMemoryRegisterSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/SystemSharedMemoryUnregister" => {
-                    #[allow(non_camel_case_types)]
-                    struct SystemSharedMemoryUnregisterSvc<T: GrpcInferenceService>(
-                        pub Arc<T>,
-                    );
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<
-                        super::SystemSharedMemoryUnregisterRequest,
-                    > for SystemSharedMemoryUnregisterSvc<T> {
-                        type Response = super::SystemSharedMemoryUnregisterResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<
-                                super::SystemSharedMemoryUnregisterRequest,
-                            >,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::system_shared_memory_unregister(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = SystemSharedMemoryUnregisterSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/CudaSharedMemoryStatus" => {
-                    #[allow(non_camel_case_types)]
-                    struct CudaSharedMemoryStatusSvc<T: GrpcInferenceService>(
-                        pub Arc<T>,
-                    );
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::CudaSharedMemoryStatusRequest>
-                    for CudaSharedMemoryStatusSvc<T> {
-                        type Response = super::CudaSharedMemoryStatusResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::CudaSharedMemoryStatusRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::cuda_shared_memory_status(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = CudaSharedMemoryStatusSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/CudaSharedMemoryRegister" => {
-                    #[allow(non_camel_case_types)]
-                    struct CudaSharedMemoryRegisterSvc<T: GrpcInferenceService>(
-                        pub Arc<T>,
-                    );
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::CudaSharedMemoryRegisterRequest>
-                    for CudaSharedMemoryRegisterSvc<T> {
-                        type Response = super::CudaSharedMemoryRegisterResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<
-                                super::CudaSharedMemoryRegisterRequest,
-                            >,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::cuda_shared_memory_register(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = CudaSharedMemoryRegisterSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/CudaSharedMemoryUnregister" => {
-                    #[allow(non_camel_case_types)]
-                    struct CudaSharedMemoryUnregisterSvc<T: GrpcInferenceService>(
-                        pub Arc<T>,
-                    );
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<
-                        super::CudaSharedMemoryUnregisterRequest,
-                    > for CudaSharedMemoryUnregisterSvc<T> {
-                        type Response = super::CudaSharedMemoryUnregisterResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<
-                                super::CudaSharedMemoryUnregisterRequest,
-                            >,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::cuda_shared_memory_unregister(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = CudaSharedMemoryUnregisterSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/TraceSetting" => {
-                    #[allow(non_camel_case_types)]
-                    struct TraceSettingSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::TraceSettingRequest>
-                    for TraceSettingSvc<T> {
-                        type Response = super::TraceSettingResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::TraceSettingRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::trace_setting(&inner, request)
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = TraceSettingSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/inference.GRPCInferenceService/LogSettings" => {
-                    #[allow(non_camel_case_types)]
-                    struct LogSettingsSvc<T: GrpcInferenceService>(pub Arc<T>);
-                    impl<
-                        T: GrpcInferenceService,
-                    > tonic::server::UnaryService<super::LogSettingsRequest>
-                    for LogSettingsSvc<T> {
-                        type Response = super::LogSettingsResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::LogSettingsRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as GrpcInferenceService>::log_settings(&inner, request)
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = LogSettingsSvc(inner);
-                        let codec = tonic_prost::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                _ => {
-                    Box::pin(async move {
-                        let mut response = http::Response::new(
-                            tonic::body::Body::default(),
-                        );
-                        let headers = response.headers_mut();
-                        headers
-                            .insert(
-                                tonic::Status::GRPC_STATUS,
-                                (tonic::Code::Unimplemented as i32).into(),
-                            );
-                        headers
-                            .insert(
-                                http::header::CONTENT_TYPE,
-                                tonic::metadata::GRPC_CONTENT_TYPE,
-                            );
-                        Ok(response)
-                    })
-                }
+            1 => {
+                let request = ServerReadyRequest::decode(req_buf)?;
+                let response = self.0.server_ready(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
             }
-        }
-    }
-    impl<T> Clone for GrpcInferenceServiceServer<T> {
-        fn clone(&self) -> Self {
-            let inner = self.inner.clone();
-            Self {
-                inner,
-                accept_compression_encodings: self.accept_compression_encodings,
-                send_compression_encodings: self.send_compression_encodings,
-                max_decoding_message_size: self.max_decoding_message_size,
-                max_encoding_message_size: self.max_encoding_message_size,
+            2 => {
+                let request = ModelReadyRequest::decode(req_buf)?;
+                let response = self.0.model_ready(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
             }
+            3 => {
+                let request = ServerMetadataRequest::decode(req_buf)?;
+                let response = self.0.server_metadata(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            4 => {
+                let request = ModelMetadataRequest::decode(req_buf)?;
+                let response = self.0.model_metadata(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            5 => {
+                let request = ModelInferRequest::decode(req_buf)?;
+                let response = self.0.model_infer(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            6 => {
+                let request = ModelConfigRequest::decode(req_buf)?;
+                let response = self.0.model_config(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            7 => {
+                let request = ModelStatisticsRequest::decode(req_buf)?;
+                let response = self.0.model_statistics(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            8 => {
+                let request = RepositoryIndexRequest::decode(req_buf)?;
+                let response = self.0.repository_index(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            9 => {
+                let request = RepositoryModelLoadRequest::decode(req_buf)?;
+                let response = self.0.repository_model_load(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            10 => {
+                let request = RepositoryModelUnloadRequest::decode(req_buf)?;
+                let response = self.0.repository_model_unload(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            11 => {
+                let request = SystemSharedMemoryStatusRequest::decode(req_buf)?;
+                let response = self.0.system_shared_memory_status(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            12 => {
+                let request = SystemSharedMemoryRegisterRequest::decode(req_buf)?;
+                let response = self.0.system_shared_memory_register(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            13 => {
+                let request = SystemSharedMemoryUnregisterRequest::decode(req_buf)?;
+                let response = self.0.system_shared_memory_unregister(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            14 => {
+                let request = CudaSharedMemoryStatusRequest::decode(req_buf)?;
+                let response = self.0.cuda_shared_memory_status(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            15 => {
+                let request = CudaSharedMemoryRegisterRequest::decode(req_buf)?;
+                let response = self.0.cuda_shared_memory_register(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            16 => {
+                let request = CudaSharedMemoryUnregisterRequest::decode(req_buf)?;
+                let response = self.0.cuda_shared_memory_unregister(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            17 => {
+                let request = TraceSettingRequest::decode(req_buf)?;
+                let response = self.0.trace_setting(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            18 => {
+                let request = LogSettingsRequest::decode(req_buf)?;
+                let response = self.0.log_settings(request).await;
+                pajamax::send_response(resp_tx, stream_id, response)
+            }
+            d => unreachable!("invalid req_disc: {d}"),
         }
-    }
-    /// Generated gRPC service name
-    pub const SERVICE_NAME: &str = "inference.GRPCInferenceService";
-    impl<T> tonic::server::NamedService for GrpcInferenceServiceServer<T> {
-        const NAME: &'static str = SERVICE_NAME;
     }
 }

@@ -12,12 +12,12 @@ use std::{
 
 use arc_swap::ArcSwap;
 use futures::FutureExt;
+use monoio::time::{Instant, sleep_until};
 use ort::{
     memory::Allocator, value::{DynTensor, DynTensorValueType, Outlet, ValueRef}
 };
 use tokio::{
     sync::{futures::Notified, Notify, RwLock},
-    time::{sleep_until, Instant},
 };
 
 use crate::tensor::batched_tensor::{BatchableTensor, BatchedOutputs};

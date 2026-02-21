@@ -6,8 +6,6 @@ mod tracing;
 use arc_swap::ArcSwap;
 use log::info;
 use std::{collections::HashMap, sync::Arc};
-use tonic::transport::Server;
-use tower::limit::ConcurrencyLimitLayer;
 
 use ort::{
     environment::{EnvironmentBuilder, GlobalThreadPoolOptions},
@@ -19,7 +17,7 @@ use ort::{
 use crate::{
     grpc::{
         inference::{
-            grpc_inference_service_server::GrpcInferenceServiceServer,
+            GrpcInferenceServiceServer,
             model_metadata_response::TensorMetadata, DataType, ModelConfig, ModelInput,
             ModelOutput,
         },
@@ -29,61 +27,29 @@ use crate::{
     tensor::supertensor::SuperTensorBuffer,
 };
 
-// Current worker that I use is 16 vcpu: 12 is for tokio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
+// Current worker that I use is 16 vcpu: 12 is for monoio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
 // TODO: make this configurable
-#[tokio::main(flavor = "multi_thread", worker_threads = 12)]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // console_subscriber::init();
-    let addr = "0.0.0.0:8001".parse()?; // Triton default gRPC port is 8001
-                                        // Initialize our service with S3 connection details
-
-    let mut model_config: Option<ModelConfig> = None;
-    let mut model_metadata: Option<ModelMetadata> = None;
-
-    let mut super_tensor_buffer: Option<SuperTensorBuffer> = None;
-    let mut model_proxy: Option<Arc<scheduler::ModelProxy>> = None;
-
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let num_cores = 12;
+    let num_executors = 8;
     let batch_size = 64;
     let capacity = 64;
 
-    let cuda_provider = CUDAExecutionProvider::default().build().error_on_failure();
-    let thread_pool =  GlobalThreadPoolOptions::default().with_intra_threads(5).unwrap().with_spin_control(true).unwrap();
+    let cuda_provider = CUDAExecutionProvider::default().with_device_id(0).build().error_on_failure();
+    let thread_pool = GlobalThreadPoolOptions::default().with_intra_threads(10).unwrap().with_spin_control(false).unwrap();
     ort::init().with_execution_providers([cuda_provider]).with_global_thread_pool(thread_pool).commit();
 
-    let session = Session::builder()
-        .unwrap()
-        .with_optimization_level(GraphOptimizationLevel::Level3)
-        .unwrap()
-        .commit_from_file("samples/model.onnx")
-        .unwrap();
+    // Create all sessions and extract metadata from the first one
+    let mut sessions = Vec::with_capacity(num_executors);
+    let mut model_proxy: Option<Arc<scheduler::ModelProxy>> = None;
 
-    let allocator = Allocator::new(
-        &session,
-        MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
-    )?;
-
-    let mut data = Tensor::<f32>::new(&allocator, [1_usize, 1_usize]).unwrap();
-    let test = data.extract_tensor_mut();
-    println!("{test:?}");
-
-    for i in 0..8 {
+    for i in 0..num_executors {
         let session = Session::builder()
             .unwrap()
             .with_optimization_level(GraphOptimizationLevel::Level3)
             .unwrap()
             .commit_from_file("samples/model.onnx")
-            // .commit_from_file("samples/matmul.onnx")
             .unwrap();
-
-        let allocator = Allocator::new(
-            &session,
-            MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
-        )?;
-
-        let mut data = Tensor::<f32>::new(&allocator, [1_usize, 1_usize]).unwrap();
-        let test = data.extract_tensor_mut();
-                    println!("{test:?}");
-
 
         if i == 0 {
             let metadata = session.metadata().unwrap();
@@ -97,8 +63,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )?,
             )?;
             let inputs = session.inputs().iter().collect();
-            super_tensor_buffer =
-                Some(SuperTensorBuffer::new(capacity, batch_size as usize, &inputs, &allocator).unwrap());
+            let super_tensor_buffer =
+                SuperTensorBuffer::new(capacity, batch_size as usize, &inputs, &allocator).unwrap();
 
             let inputs = session
                 .inputs()
@@ -115,8 +81,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map(|(_, dim)| dim)
                         .cloned()
                         .collect();
-                    // println!("tensor dims {} {:?}", input.name.clone(), tensor_shape);
-                    // let tensor_ = input.input_type
                     ModelInput {
                         name: input.name().to_string(),
                         data_type: (*tensor_type).into(),
@@ -146,8 +110,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map(|(_, dim)| dim)
                         .cloned()
                         .collect();
-                    // println!("tensor dims {} {:?}", input.name.clone(), tensor_shape);
-                    // let tensor_ = input.input_type
                     ModelOutput {
                         name: output.name().to_string(),
                         data_type: (*tensor_type).into(),
@@ -173,8 +135,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .iter()
                         .cloned()
                         .collect();
-                    // println!("tensor shape {} {:?}", input.name.clone(), tensor_shape);
-                    // let tensor_ = input.input_type
                     let mut input_shape = input.dtype().tensor_shape().unwrap().clone();
                     input_shape[0] = 1;
                     input_set.insert(input.name().to_string(), input_shape);
@@ -198,8 +158,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .iter()
                         .cloned()
                         .collect();
-                    // println!("tensor shape {} {:?}", input.name.clone(), tensor_shape);
-                    // let tensor_ = input.input_type
                     TensorMetadata {
                         name: output.name().to_string(),
                         datatype: tensor_type.to_metadata_string(),
@@ -208,13 +166,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .collect();
 
-            model_metadata = Some(ModelMetadata {
+            let model_metadata = ModelMetadata {
                 input_meta: input_metadata,
                 output_meta: output_metadata,
                 input_set,
-            });
+            };
 
-            model_config = Some(ModelConfig {
+            let model_config = ModelConfig {
                 name: metadata.name().unwrap(),
                 platform: String::from("onnxruntime_onnx"),
                 backend: String::from("onnxruntime"),
@@ -238,41 +196,85 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 response_cache: None,
                 model_metrics: None,
                 scheduling_choice: None,
-            });
+            };
 
             model_proxy = Some(Arc::from(scheduler::ModelProxy {
-                data: super_tensor_buffer.unwrap(),
-                model_config: model_config.unwrap(),
-                model_metadata: model_metadata.unwrap(),
+                data: super_tensor_buffer,
+                model_config,
+                model_metadata,
             }));
         }
 
-        let mut executor = loader::OnnxExecutor {
-            id: format!("executor-{i}"),
-            session,
-            model: model_proxy.clone().unwrap(),
-        };
-        tokio::spawn(async move {
-            executor.run().await;
-        });
+        sessions.push(session);
     }
 
+    let model_proxy = model_proxy.unwrap();
+
     let mut model_map = HashMap::new();
-    model_map.insert(
-        String::from("Int64ToFloat64Model"),
-        model_proxy.clone().unwrap(),
-    );
-    let service = TritonService::new(Arc::from(ArcSwap::from_pointee(model_map)));
+    model_map.insert(String::from("Int64ToFloat64Model"), model_proxy.clone());
+    let loaded_models = Arc::new(ArcSwap::from_pointee(model_map));
 
+    // Distribute executors to cores round-robin
+    let mut per_core_sessions: Vec<Vec<(usize, Session)>> = (0..num_cores).map(|_| Vec::new()).collect();
+    for (i, session) in sessions.into_iter().enumerate() {
+        per_core_sessions[i % num_cores].push((i, session));
+    }
+
+    let addr = "0.0.0.0:8001";
     info!("Starting Triton gRPC server on {}", addr);
-    let svc = GrpcInferenceServiceServer::new(service).max_decoding_message_size(128 * 1024 * 1024);
-    let layer = ConcurrencyLimitLayer::new(64 * 64);
 
-    Server::builder()
-        .layer(layer)
-        .add_service(svc)
-        .serve(addr)
-        .await?;
+    let config = pajamax::Config::new()
+        .max_concurrent_connections(100000)
+        .max_concurrent_streams(100000)
+        .max_frame_size(32 * 1024);
+
+    // Spawn one thread per core, each running executors + pajamax listener on the same monoio runtime
+    let mut handles = Vec::new();
+    for (core_id, core_sessions) in per_core_sessions.into_iter().enumerate() {
+        let model_proxy = model_proxy.clone();
+        let loaded_models = loaded_models.clone();
+        let addr = addr.to_string();
+
+        let handle = std::thread::Builder::new()
+            .name(format!("core-{core_id}"))
+            .spawn(move || {
+                let mut rt = monoio::RuntimeBuilder::<monoio::IoUringDriver>::new()
+                    .enable_all()
+                    .build()
+                    .expect("failed to build monoio runtime");
+
+                rt.block_on(async move {
+                    // Spawn executors assigned to this core
+                    for (i, session) in core_sessions {
+                        let model_proxy = model_proxy.clone();
+                        monoio::spawn(async move {
+                            let mut executor = loader::OnnxExecutor {
+                                id: format!("executor-{i}"),
+                                session,
+                                model: model_proxy,
+                            };
+                            executor.run().await;
+                        });
+                    }
+
+                    // Run pajamax listener on the same runtime
+                    let service = GrpcInferenceServiceServer::new(
+                        TritonService::new(loaded_models),
+                    );
+                    let services: Vec<std::rc::Rc<dyn pajamax::PajamaxService>> =
+                        vec![std::rc::Rc::new(service)];
+                    pajamax::connection::accept_loop(services, config, addr)
+                        .await
+                        .expect("accept loop failed");
+                });
+            })
+            .unwrap();
+        handles.push(handle);
+    }
+
+    for h in handles {
+        h.join().expect("worker thread panicked");
+    }
 
     Ok(())
 }
