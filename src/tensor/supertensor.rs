@@ -12,7 +12,8 @@ use std::{
 
 use arc_swap::ArcSwap;
 use futures::FutureExt;
-use monoio::time::{Instant, sleep_until};
+use compio::runtime::time::sleep_until;
+use std::time::Instant;
 use ort::{
     memory::Allocator, value::{DynTensor, DynTensorValueType, Outlet, ValueRef}
 };

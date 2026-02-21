@@ -27,16 +27,16 @@ use crate::{
     tensor::supertensor::SuperTensorBuffer,
 };
 
-// Current worker that I use is 16 vcpu: 12 is for monoio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
+// Current worker that I use is 16 vcpu: 12 is for compio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
 // TODO: make this configurable
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let num_cores = 12;
+    let num_cores = 4;
     let num_executors = 8;
     let batch_size = 64;
     let capacity = 64;
 
     let cuda_provider = CUDAExecutionProvider::default().with_device_id(0).build().error_on_failure();
-    let thread_pool = GlobalThreadPoolOptions::default().with_intra_threads(10).unwrap().with_spin_control(false).unwrap();
+    let thread_pool = GlobalThreadPoolOptions::default().with_intra_threads(4).unwrap().with_spin_control(false).unwrap();
     ort::init().with_execution_providers([cuda_provider]).with_global_thread_pool(thread_pool).commit();
 
     // Create all sessions and extract metadata from the first one
@@ -228,7 +228,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_concurrent_streams(100000)
         .max_frame_size(32 * 1024);
 
-    // Spawn one thread per core, each running executors + pajamax listener on the same monoio runtime
+    // Spawn one thread per core, each running executors + pajamax listener on the same compio runtime
     let mut handles = Vec::new();
     for (core_id, core_sessions) in per_core_sessions.into_iter().enumerate() {
         let model_proxy = model_proxy.clone();
@@ -238,23 +238,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let handle = std::thread::Builder::new()
             .name(format!("core-{core_id}"))
             .spawn(move || {
-                let mut rt = monoio::RuntimeBuilder::<monoio::IoUringDriver>::new()
-                    .enable_all()
+                let rt = compio::runtime::RuntimeBuilder::new()
                     .build()
-                    .expect("failed to build monoio runtime");
+                    .expect("failed to build compio runtime");
 
                 rt.block_on(async move {
                     // Spawn executors assigned to this core
                     for (i, session) in core_sessions {
                         let model_proxy = model_proxy.clone();
-                        monoio::spawn(async move {
+                        compio::runtime::spawn(async move {
                             let mut executor = loader::OnnxExecutor {
                                 id: format!("executor-{i}"),
                                 session,
                                 model: model_proxy,
                             };
                             executor.run().await;
-                        });
+                        }).detach();
                     }
 
                     // Run pajamax listener on the same runtime

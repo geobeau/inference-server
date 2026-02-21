@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.47.0", features = ["full"] }
-monoio = { version = "0.2", features = ["sync"] }
+compio = { version = "0.18", features = ["runtime", "time"] }
 criterion = "0.5.1"
 ort = { git = "https://github.com/pykeio/ort", branch = "main", features = [ "cuda", "load-dynamic"] }
 ort-sys = { git = "https://github.com/pykeio/ort", branch = "main", default-features = false }
