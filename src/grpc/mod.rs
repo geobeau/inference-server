@@ -5,24 +5,24 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::{collections::HashMap, vec};
 
-use inference::grpc_inference_service_server::GrpcInferenceService; // Trait
+use arc_swap::ArcSwap;
+use inference::GrpcInferenceService;
 use inference::*;
-use tokio::sync::RwLock;
-use tonic::{Request, Response, Status};
+use pajamax::status::{Code, Status};
 
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
-use crate::scheduler::{InferenceRequest, ModelProxy};
-use crate::tensor::dyntensor_from_bytes;
+use crate::scheduler::ModelProxy;
+use crate::tensor::batched_tensor::dyntensor_from_bytes;
 use crate::tracing::Trace;
 
 #[derive(Clone)]
 pub struct TritonService {
     /// Set of model names that are currently considered "loaded"
-    pub loaded_models: Arc<RwLock<HashMap<String, ModelProxy>>>,
+    pub loaded_models: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
 }
 
 impl TritonService {
-    pub fn new(model_map: Arc<RwLock<HashMap<String, ModelProxy>>>) -> Self {
+    pub fn new(model_map: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>) -> Self {
         TritonService {
             loaded_models: model_map,
         }
@@ -31,157 +31,122 @@ impl TritonService {
 
 unsafe impl Send for ModelInferResponse {}
 
-#[tonic::async_trait]
+#[async_trait::async_trait(?Send)]
 impl GrpcInferenceService for TritonService {
     async fn server_live(
         &self,
-        _req: Request<ServerLiveRequest>,
-    ) -> Result<Response<ServerLiveResponse>, Status> {
+        _req: ServerLiveRequest,
+    ) -> Result<ServerLiveResponse, Status> {
         println!("is live?");
-        Ok(Response::new(ServerLiveResponse { live: true }))
+        Ok(ServerLiveResponse { live: true })
     }
 
     async fn server_ready(
         &self,
-        _req: Request<ServerReadyRequest>,
-    ) -> Result<Response<ServerReadyResponse>, Status> {
+        _req: ServerReadyRequest,
+    ) -> Result<ServerReadyResponse, Status> {
         println!("is server ready?");
-        // Ready if server is up (you could check if models loaded, etc.)
-        Ok(Response::new(ServerReadyResponse { ready: true }))
+        Ok(ServerReadyResponse { ready: true })
     }
 
     async fn model_ready(
         &self,
-        request: Request<ModelReadyRequest>,
-    ) -> Result<Response<ModelReadyResponse>, Status> {
+        request: ModelReadyRequest,
+    ) -> Result<ModelReadyResponse, Status> {
         println!("is model ready?");
-        let _ = request.get_ref().name.clone();
-        // For demo, return true if the model is in our loaded set (else false)
-        let is_ready = /* check if model_name is loaded */ false;
-        Ok(Response::new(ModelReadyResponse { ready: is_ready }))
+        let _ = request.name.clone();
+        let is_ready = false;
+        Ok(ModelReadyResponse { ready: is_ready })
     }
 
     async fn server_metadata(
         &self,
-        _req: Request<ServerMetadataRequest>,
-    ) -> Result<Response<ServerMetadataResponse>, Status> {
+        _req: ServerMetadataRequest,
+    ) -> Result<ServerMetadataResponse, Status> {
         println!("server metadata");
         let reply = ServerMetadataResponse {
             name: "inference-server".to_string(),
             version: "1.0.0-demo".to_string(),
             extensions: vec!["classification".to_string(), "model_repository".to_string()],
         };
-        Ok(Response::new(reply))
+        Ok(reply)
     }
 
     async fn model_metadata(
         &self,
-        request: Request<ModelMetadataRequest>,
-    ) -> Result<Response<ModelMetadataResponse>, Status> {
-        let model_name = &request.get_ref().name;
+        request: ModelMetadataRequest,
+    ) -> Result<ModelMetadataResponse, Status> {
+        let model_name = &request.name;
         println!("Getting model config for {model_name}");
-        match self.loaded_models.read().await.get(model_name) {
-            Some(proxy) => Ok(Response::new(ModelMetadataResponse {
+        match self.loaded_models.load().get(model_name) {
+            Some(proxy) => {
+                println!("Got model, responding");
+                Ok(ModelMetadataResponse {
                 name: model_name.clone(),
                 versions: vec![String::from("1")],
                 platform: String::from("onnxruntime_onnx"),
                 inputs: proxy.model_metadata.input_meta.clone(),
                 outputs: proxy.model_metadata.output_meta.clone(),
-            })),
-            None => Err(Status::not_found(format!("Model {} not found", model_name))),
+            })}
+            ,
+            None => Err(Status {
+                code: Code::NotFound,
+                message: format!("Model {} not found", model_name),
+            }),
         }
     }
 
-    // let mut rng = rand::rng();
-    // let input_a = ndarray::Array2::<f32>::from_shape_fn((1024, 1024), |_| rng.random::<f32>());
-    // let input_b = ndarray::Array2::<f32>::from_shape_fn((1024, 1024), |_| rng.random::<f32>());
-
-    // let data1 = Tensor::from_array(input_a).unwrap().upcast();
-    // let data2 = Tensor::from_array(input_b).unwrap().upcast();
-
-    // let mut data: HashMap<String, DynTensor> = HashMap::with_capacity(2);
-
-    // data.insert(String::from("A"), data1);
-    // data.insert(String::from("B"), data2);
-
-    // match input_tx.send(data) {
-    //     Ok(_) => println!("success"),
-    //     Err(x) => println!("Error {}", x),
-    // }
-
     async fn model_infer(
         &self,
-        request: Request<ModelInferRequest>,
-    ) -> Result<Response<ModelInferResponse>, Status> {
-        let request_ref = request.get_ref();
+        request: ModelInferRequest,
+    ) -> Result<ModelInferResponse, Status> {
         let mut trace = Trace::start();
 
-        let proxy: ModelProxy;
-        {
-            // Force the lock to be dropped
-            proxy = match self
-                .loaded_models
-                .write()
-                .await
-                .get(&request_ref.model_name)
-            {
-                Some(proxy) => proxy.clone(),
-                None => {
-                    return Err(Status::not_found(format!(
-                        "Model {} not found",
-                        &request_ref.model_name
-                    )))
-                }
-            };
-        }
+        let models = self.loaded_models.load();
 
-        let (sender, receiver) = flume::bounded(1);
+        let proxy: &ModelProxy = match models.get(&request.model_name) {
+            Some(proxy) => proxy,
+            None => {
+                return Err(Status {
+                    code: Code::NotFound,
+                    message: format!("Model {} not found", &request.model_name),
+                })
+            }
+        };
+
         let mut inputs = HashMap::new();
 
         trace.record_serialization_start();
-        request_ref
+        request
             .inputs
             .iter()
             .enumerate()
             .for_each(|(i, req_input)| {
-                // println!(
-                //     "{} {} {:?} {}",
-                //     req_input.name,
-                //     req_input.datatype,
-                //     (req_input.shape),
-                //     request_ref.raw_input_contents[i].len()
-                // );
                 let dimensions: Vec<usize> = req_input.shape.iter().map(|i| *i as usize).collect();
                 let tensor = dyntensor_from_bytes(
                     DataType::from_str(&req_input.datatype),
                     &dimensions,
-                    &request_ref.raw_input_contents[i],
+                    &request.raw_input_contents[i],
                 );
-
+                let input_shape = proxy
+                    .model_metadata
+                    .input_set
+                    .get(&req_input.name)
+                    .expect("Input provided not in the model");
+                assert_eq!(tensor.shape(), input_shape, "expected the shape to match");
                 inputs.insert(req_input.name.clone(), tensor);
             });
 
         trace.record_dispatch();
-        let req = InferenceRequest {
-            inputs,
-            resp_chan: sender,
-            trace,
-        };
-
-        // println!("dispatch");
-        proxy.request_sender.send_async(req).await.unwrap();
-        let mut resp = receiver.recv_async().await.unwrap();
-
-        // println!("resp");
+        let inference_outputs = proxy.data.infer(&inputs).await.unwrap();
         let mut raw_output: Vec<Vec<u8>> = Vec::new();
 
-        let outputs = resp
-            .outputs
+        let outputs = inference_outputs
             .iter()
             .map(|(key, output)| {
                 let data_type = output.data_type();
 
-                let (shape, serial_data) = output.try_extract_tensor::<f64>().unwrap();
+                let (shape, serial_data) = output.try_extract_tensor::<f32>().unwrap();
                 let bytes: Vec<u8> = serial_data
                     .iter()
                     .flat_map(|value| value.to_le_bytes())
@@ -198,126 +163,119 @@ impl GrpcInferenceService for TritonService {
             })
             .collect();
 
-        resp.trace.record_process_response();
-        // println!("{:?}", resp.trace);
-
-        Ok(Response::new(ModelInferResponse {
+        Ok(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),
             model_version: String::from("1"),
-            id: request_ref.id.clone(),
+            id: request.id.clone(),
             parameters: HashMap::with_capacity(0),
             outputs,
             raw_output_contents: raw_output,
-        }))
+        })
     }
 
     async fn model_config(
         &self,
-        request: Request<ModelConfigRequest>,
-    ) -> Result<Response<ModelConfigResponse>, Status> {
-        let model_name = &request.get_ref().name;
+        request: ModelConfigRequest,
+    ) -> Result<ModelConfigResponse, Status> {
+        let model_name = &request.name;
         println!("Getting model config for {model_name}");
-        match self.loaded_models.read().await.get(model_name) {
-            Some(proxy) => Ok(Response::new(ModelConfigResponse {
+        match self.loaded_models.load().get(model_name) {
+            Some(proxy) => Ok(ModelConfigResponse {
                 config: Some(proxy.model_config.clone()),
-            })),
-            None => Err(Status::not_found(format!("Model {} not found", model_name))),
+            }),
+            None => Err(Status {
+                code: Code::NotFound,
+                message: format!("Model {} not found", model_name),
+            }),
         }
     }
 
     async fn model_statistics(
         &self,
-        _request: Request<ModelStatisticsRequest>,
-    ) -> Result<Response<ModelStatisticsResponse>, Status> {
+        _request: ModelStatisticsRequest,
+    ) -> Result<ModelStatisticsResponse, Status> {
         println!("stat");
         todo!()
     }
 
     async fn repository_index(
         &self,
-        _request: Request<RepositoryIndexRequest>,
-    ) -> Result<Response<RepositoryIndexResponse>, Status> {
+        _request: RepositoryIndexRequest,
+    ) -> Result<RepositoryIndexResponse, Status> {
         println!("index");
-        // Dummy implementation
-        Ok(Response::new(RepositoryIndexResponse { models: vec![] }))
+        Ok(RepositoryIndexResponse { models: vec![] })
     }
 
     async fn repository_model_load(
         &self,
-        _request: Request<RepositoryModelLoadRequest>,
-    ) -> Result<Response<RepositoryModelLoadResponse>, Status> {
+        _request: RepositoryModelLoadRequest,
+    ) -> Result<RepositoryModelLoadResponse, Status> {
         println!("load");
-        // Dummy implementation
-        Ok(Response::new(RepositoryModelLoadResponse {}))
+        Ok(RepositoryModelLoadResponse {})
     }
 
     async fn repository_model_unload(
         &self,
-        _request: Request<RepositoryModelUnloadRequest>,
-    ) -> Result<Response<RepositoryModelUnloadResponse>, Status> {
+        _request: RepositoryModelUnloadRequest,
+    ) -> Result<RepositoryModelUnloadResponse, Status> {
         println!("unload");
-        // Dummy implementation
-        Ok(Response::new(RepositoryModelUnloadResponse {}))
+        Ok(RepositoryModelUnloadResponse {})
     }
 
     async fn system_shared_memory_status(
         &self,
-        _request: Request<SystemSharedMemoryStatusRequest>,
-    ) -> Result<Response<SystemSharedMemoryStatusResponse>, Status> {
+        _request: SystemSharedMemoryStatusRequest,
+    ) -> Result<SystemSharedMemoryStatusResponse, Status> {
         println!("status");
         todo!()
     }
 
     async fn system_shared_memory_register(
         &self,
-        _request: Request<SystemSharedMemoryRegisterRequest>,
-    ) -> Result<Response<SystemSharedMemoryRegisterResponse>, Status> {
+        _request: SystemSharedMemoryRegisterRequest,
+    ) -> Result<SystemSharedMemoryRegisterResponse, Status> {
         todo!()
     }
 
     async fn system_shared_memory_unregister(
         &self,
-        _request: Request<SystemSharedMemoryUnregisterRequest>,
-    ) -> Result<Response<SystemSharedMemoryUnregisterResponse>, Status> {
+        _request: SystemSharedMemoryUnregisterRequest,
+    ) -> Result<SystemSharedMemoryUnregisterResponse, Status> {
         todo!()
     }
 
     async fn cuda_shared_memory_status(
         &self,
-        _request: Request<CudaSharedMemoryStatusRequest>,
-    ) -> Result<Response<CudaSharedMemoryStatusResponse>, Status> {
-        // Dummy implementation
+        _request: CudaSharedMemoryStatusRequest,
+    ) -> Result<CudaSharedMemoryStatusResponse, Status> {
         todo!()
     }
 
     async fn cuda_shared_memory_register(
         &self,
-        _request: Request<CudaSharedMemoryRegisterRequest>,
-    ) -> Result<Response<CudaSharedMemoryRegisterResponse>, Status> {
-        // Dummy implementation
-        Ok(Response::new(CudaSharedMemoryRegisterResponse {}))
+        _request: CudaSharedMemoryRegisterRequest,
+    ) -> Result<CudaSharedMemoryRegisterResponse, Status> {
+        Ok(CudaSharedMemoryRegisterResponse {})
     }
 
     async fn cuda_shared_memory_unregister(
         &self,
-        _request: Request<CudaSharedMemoryUnregisterRequest>,
-    ) -> Result<Response<CudaSharedMemoryUnregisterResponse>, Status> {
-        // Dummy implementation
-        Ok(Response::new(CudaSharedMemoryUnregisterResponse {}))
+        _request: CudaSharedMemoryUnregisterRequest,
+    ) -> Result<CudaSharedMemoryUnregisterResponse, Status> {
+        Ok(CudaSharedMemoryUnregisterResponse {})
     }
 
     async fn trace_setting(
         &self,
-        _request: Request<TraceSettingRequest>,
-    ) -> Result<Response<TraceSettingResponse>, Status> {
+        _request: TraceSettingRequest,
+    ) -> Result<TraceSettingResponse, Status> {
         todo!()
     }
 
     async fn log_settings(
         &self,
-        _request: Request<LogSettingsRequest>,
-    ) -> Result<Response<LogSettingsResponse>, Status> {
-        // Dummy implementation
+        _request: LogSettingsRequest,
+    ) -> Result<LogSettingsResponse, Status> {
         todo!()
     }
 }

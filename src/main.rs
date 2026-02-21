@@ -1,73 +1,78 @@
-#![feature(array_chunks)]
 mod grpc;
 mod loader;
 mod scheduler;
 mod tensor;
 mod tracing;
-use std::{collections::HashMap, sync::Arc, time::Duration};
-use tonic::transport::Server;
+use arc_swap::ArcSwap;
+use log::info;
+use std::{collections::HashMap, sync::Arc};
 
 use ort::{
-    execution_providers::{CPUExecutionProvider, OpenVINOExecutionProvider},
-    session::{builder::GraphOptimizationLevel, Session},
+    environment::{EnvironmentBuilder, GlobalThreadPoolOptions},
+    execution_providers::{CPUExecutionProvider, CUDAExecutionProvider, OpenVINOExecutionProvider},
+    memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
+    session::{Session, builder::GraphOptimizationLevel}, value::Tensor,
 };
-use tokio::sync::RwLock;
 
 use crate::{
     grpc::{
         inference::{
-            grpc_inference_service_server::GrpcInferenceServiceServer,
+            GrpcInferenceServiceServer,
             model_metadata_response::TensorMetadata, DataType, ModelConfig, ModelInput,
             ModelOutput,
         },
         TritonService,
     },
     scheduler::ModelMetadata,
+    tensor::supertensor::SuperTensorBuffer,
 };
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    console_subscriber::init();
-    let addr = "0.0.0.0:8001".parse()?; // Triton default gRPC port is 8001
-                                        // Initialize our service with S3 connection details
+// Current worker that I use is 16 vcpu: 12 is for monoio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
+// TODO: make this configurable
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let num_cores = 12;
+    let num_executors = 8;
+    let batch_size = 64;
+    let capacity = 64;
 
-    let (input_tx, input_rx) = flume::bounded(4096);
+    let cuda_provider = CUDAExecutionProvider::default().with_device_id(0).build().error_on_failure();
+    let thread_pool = GlobalThreadPoolOptions::default().with_intra_threads(10).unwrap().with_spin_control(false).unwrap();
+    ort::init().with_execution_providers([cuda_provider]).with_global_thread_pool(thread_pool).commit();
 
-    let mut executor_endpoints = Vec::new();
+    // Create all sessions and extract metadata from the first one
+    let mut sessions = Vec::with_capacity(num_executors);
+    let mut model_proxy: Option<Arc<scheduler::ModelProxy>> = None;
 
-    let mut model_config: Option<ModelConfig> = None;
-    let mut model_metadata: Option<ModelMetadata> = None;
-
-    let batch_size = 16;
-    for i in 0..1 {
-        let (tx, rx) = flume::bounded(batch_size as usize);
-        let vino_provider = OpenVINOExecutionProvider::default()
-            .with_device_type("CPU")
-            .build();
-        let _cpu_provider = CPUExecutionProvider::default().build();
+    for i in 0..num_executors {
         let session = Session::builder()
             .unwrap()
-            .with_optimization_level(GraphOptimizationLevel::Level1)
+            .with_optimization_level(GraphOptimizationLevel::Level3)
             .unwrap()
-            .with_execution_providers([vino_provider])
-            .unwrap()
-            .with_intra_threads(4)
-            .unwrap()
-            .with_log_level(ort::logging::LogLevel::Verbose).unwrap()
-            .commit_from_file("samples/int64_to_float64.onnx")
-            // .commit_from_file("samples/matmul.onnx")
+            .commit_from_file("samples/model.onnx")
             .unwrap();
 
-        {
+        if i == 0 {
             let metadata = session.metadata().unwrap();
+            let allocator = Allocator::new(
+                &session,
+                MemoryInfo::new(
+                    AllocationDevice::CUDA_PINNED,
+                    0,
+                    AllocatorType::Device,
+                    MemoryType::CPUInput,
+                )?,
+            )?;
+            let inputs = session.inputs().iter().collect();
+            let super_tensor_buffer =
+                SuperTensorBuffer::new(capacity, batch_size as usize, &inputs, &allocator).unwrap();
 
             let inputs = session
-                .inputs
+                .inputs()
                 .iter()
                 .map(|input| {
-                    let tensor_type: &DataType = &input.input_type.tensor_type().unwrap().into();
+                    let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
                     let tensor_shape: Vec<i64> = input
-                        .input_type
+                        .dtype()
                         .tensor_shape()
                         .unwrap()
                         .iter()
@@ -76,10 +81,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map(|(_, dim)| dim)
                         .cloned()
                         .collect();
-                    // println!("tensor dims {} {:?}", input.name.clone(), tensor_shape);
-                    // let tensor_ = input.input_type
                     ModelInput {
-                        name: input.name.clone(),
+                        name: input.name().to_string(),
                         data_type: (*tensor_type).into(),
                         format: 0,
                         dims: tensor_shape,
@@ -93,12 +96,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect();
 
             let outputs = session
-                .outputs
+                .outputs()
                 .iter()
                 .map(|output| {
-                    let tensor_type: &DataType = &output.output_type.tensor_type().unwrap().into();
+                    let tensor_type: &DataType = &output.dtype().tensor_type().unwrap().into();
                     let tensor_shape: Vec<i64> = output
-                        .output_type
+                        .dtype()
                         .tensor_shape()
                         .unwrap()
                         .iter()
@@ -107,10 +110,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map(|(_, dim)| dim)
                         .cloned()
                         .collect();
-                    // println!("tensor dims {} {:?}", input.name.clone(), tensor_shape);
-                    // let tensor_ = input.input_type
                     ModelOutput {
-                        name: output.name.clone(),
+                        name: output.name().to_string(),
                         data_type: (*tensor_type).into(),
                         dims: tensor_shape,
                         reshape: None,
@@ -121,22 +122,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .collect();
 
+            let mut input_set = HashMap::new();
             let input_metadata = session
-                .inputs
+                .inputs()
                 .iter()
                 .map(|input| {
-                    let tensor_type: &DataType = &input.input_type.tensor_type().unwrap().into();
+                    let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
                     let tensor_shape: Vec<i64> = input
-                        .input_type
+                        .dtype()
                         .tensor_shape()
                         .unwrap()
                         .iter()
                         .cloned()
                         .collect();
-                    // println!("tensor shape {} {:?}", input.name.clone(), tensor_shape);
-                    // let tensor_ = input.input_type
+                    let mut input_shape = input.dtype().tensor_shape().unwrap().clone();
+                    input_shape[0] = 1;
+                    input_set.insert(input.name().to_string(), input_shape);
                     TensorMetadata {
-                        name: input.name.clone(),
+                        name: input.name().to_string(),
                         datatype: tensor_type.to_metadata_string(),
                         shape: tensor_shape,
                     }
@@ -144,33 +147,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect();
 
             let output_metadata = session
-                .outputs
+                .outputs()
                 .iter()
                 .map(|output| {
-                    let tensor_type: &DataType = &output.output_type.tensor_type().unwrap().into();
+                    let tensor_type: &DataType = &output.dtype().tensor_type().unwrap().into();
                     let tensor_shape: Vec<i64> = output
-                        .output_type
+                        .dtype()
                         .tensor_shape()
                         .unwrap()
                         .iter()
                         .cloned()
                         .collect();
-                    // println!("tensor shape {} {:?}", input.name.clone(), tensor_shape);
-                    // let tensor_ = input.input_type
                     TensorMetadata {
-                        name: output.name.clone(),
+                        name: output.name().to_string(),
                         datatype: tensor_type.to_metadata_string(),
                         shape: tensor_shape,
                     }
                 })
                 .collect();
 
-            model_metadata = Some(ModelMetadata {
+            let model_metadata = ModelMetadata {
                 input_meta: input_metadata,
                 output_meta: output_metadata,
-            });
+                input_set,
+            };
 
-            model_config = Some(ModelConfig {
+            let model_config = ModelConfig {
                 name: metadata.name().unwrap(),
                 platform: String::from("onnxruntime_onnx"),
                 backend: String::from("onnxruntime"),
@@ -194,58 +196,85 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 response_cache: None,
                 model_metrics: None,
                 scheduling_choice: None,
-            });
+            };
+
+            model_proxy = Some(Arc::from(scheduler::ModelProxy {
+                data: super_tensor_buffer,
+                model_config,
+                model_metadata,
+            }));
         }
 
-        let mut executor = loader::OnnxExecutor {
-            id: format!("executor-{i}"),
-            session,
-            batch_size: batch_size as usize,
-            inputs: rx,
-        };
-        tokio::spawn(async move {
-            executor.run().await;
-        });
-
-        let endpoint = scheduler::ExecutorEndpoint { sender: tx };
-        executor_endpoints.push(endpoint);
+        sessions.push(session);
     }
 
-    let mut sched = scheduler::Scheduler {
-        inputs: input_rx,
-        executors: executor_endpoints,
-        max_queue_time: Duration::from_millis(2),
-        batch_size,
-    };
-
-    let model_proxy = scheduler::ModelProxy {
-        request_sender: input_tx,
-        model_config: model_config.unwrap(),
-        model_metadata: model_metadata.unwrap(),
-    };
+    let model_proxy = model_proxy.unwrap();
 
     let mut model_map = HashMap::new();
-    model_map.insert(String::from("Int64ToFloat64Model"), model_proxy);
-    let service = TritonService::new(Arc::from(RwLock::from(model_map)));
+    model_map.insert(String::from("Int64ToFloat64Model"), model_proxy.clone());
+    let loaded_models = Arc::new(ArcSwap::from_pointee(model_map));
 
-    tokio::spawn(async move {
-        sched.run().await;
-    });
+    // Distribute executors to cores round-robin
+    let mut per_core_sessions: Vec<Vec<(usize, Session)>> = (0..num_cores).map(|_| Vec::new()).collect();
+    for (i, session) in sessions.into_iter().enumerate() {
+        per_core_sessions[i % num_cores].push((i, session));
+    }
 
-    println!("Starting Triton gRPC server on {}", addr);
-    let svc = GrpcInferenceServiceServer::new(service).max_decoding_message_size(128 * 1024 * 1024);
-    Server::builder()
-        // .layer(
-        //     ServiceBuilder::new().layer(TraceLayer::new_for_grpc().make_span_with(
-        //         |request: &Request<_>| {
-        //             println!("Received request: {:?}", request);
-        //             tracing::info_span!("grpc_request")
-        //         },
-        //     )),
-        // )
-        .add_service(svc)
-        .serve(addr)
-        .await?;
+    let addr = "0.0.0.0:8001";
+    info!("Starting Triton gRPC server on {}", addr);
+
+    let config = pajamax::Config::new()
+        .max_concurrent_connections(100000)
+        .max_concurrent_streams(100000)
+        .max_frame_size(32 * 1024);
+
+    // Spawn one thread per core, each running executors + pajamax listener on the same monoio runtime
+    let mut handles = Vec::new();
+    for (core_id, core_sessions) in per_core_sessions.into_iter().enumerate() {
+        let model_proxy = model_proxy.clone();
+        let loaded_models = loaded_models.clone();
+        let addr = addr.to_string();
+
+        let handle = std::thread::Builder::new()
+            .name(format!("core-{core_id}"))
+            .spawn(move || {
+                let mut rt = monoio::RuntimeBuilder::<monoio::IoUringDriver>::new()
+                    .enable_all()
+                    .build()
+                    .expect("failed to build monoio runtime");
+
+                rt.block_on(async move {
+                    // Spawn executors assigned to this core
+                    for (i, session) in core_sessions {
+                        let model_proxy = model_proxy.clone();
+                        monoio::spawn(async move {
+                            let mut executor = loader::OnnxExecutor {
+                                id: format!("executor-{i}"),
+                                session,
+                                model: model_proxy,
+                            };
+                            executor.run().await;
+                        });
+                    }
+
+                    // Run pajamax listener on the same runtime
+                    let service = GrpcInferenceServiceServer::new(
+                        TritonService::new(loaded_models),
+                    );
+                    let services: Vec<std::rc::Rc<dyn pajamax::PajamaxService>> =
+                        vec![std::rc::Rc::new(service)];
+                    pajamax::connection::accept_loop(services, config, addr)
+                        .await
+                        .expect("accept loop failed");
+                });
+            })
+            .unwrap();
+        handles.push(handle);
+    }
+
+    for h in handles {
+        h.join().expect("worker thread panicked");
+    }
 
     Ok(())
 }
