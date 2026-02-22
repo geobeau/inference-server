@@ -20,28 +20,10 @@ use ort::{
 use std::time::Instant;
 use tokio::sync::{futures::Notified, Notify, RwLock};
 
-use crate::tensor::batched_tensor::{BatchableTensor, BatchedOutputs};
+use crate::{tensor::batched_tensor::{BatchableTensor, BatchedOutputs}, tracing::ClientTrace};
 
 const HALF_RANGE: usize = usize::MAX / 2;
 
-pub struct Trace {
-    pub batch_first_open: RefCell<std::time::Instant>,
-    pub batch_complete: RefCell<std::time::Duration>,
-    batch_inference_start: RefCell<std::time::Duration>,
-    batch_inference_done: RefCell<std::time::Duration>,
-    batch_released: RefCell<std::time::Duration>,
-}
-
-impl Trace {
-    fn print_debug(&self) {
-        println!("---\ntime to complete batch {:?}\n picked by executor {:?}\n inference duration {:?}\n time to gather output {:?}", 
-            self.batch_complete.borrow(),
-            *self.batch_inference_start.borrow() - *self.batch_complete.borrow(),
-            *self.batch_inference_done.borrow() - *self.batch_inference_start.borrow(),
-            *self.batch_released.borrow() - *self.batch_inference_done.borrow(),
-        )
-    }
-}
 
 struct DataTracker {
     // Dirty buffer should not be reused
@@ -291,6 +273,7 @@ impl SuperTensorBuffer {
     pub async fn infer(
         &self,
         data: &HashMap<String, DynTensor>,
+        trace: &mut ClientTrace,
     ) -> Result<HashMap<String, DynTensor>, usize> {
         loop {
             let current_head = self.head.load(Ordering::Relaxed);
@@ -309,6 +292,7 @@ impl SuperTensorBuffer {
             ) {
                 Ok(_) => {
                     let write_reservation = self.insert_tensors_at(current_head, data);
+                    trace.record_inference_in_queue();
                     return Ok(write_reservation.get_result().await);
                 }
                 Err(_) => {

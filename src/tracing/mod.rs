@@ -1,56 +1,70 @@
-use std::time::Duration;
+use std::{cell::RefCell, time::Duration};
 
 use tokio::time::Instant;
 
 #[derive(Debug)]
-pub struct Trace {
+pub struct ClientTrace {
     pub start: Instant,
-    serialization_start: Option<Duration>,
-    dispatch: Option<Duration>,
-    scheduling_start: Option<Duration>,
-    executor_queue: Option<Duration>,
-    executor_start: Option<Duration>,
-    send_response: Option<Duration>,
-    process_response: Option<Duration>,
+    model_proxy_aquired: Option<Duration>,
+    serialization_done: Option<Duration>,
+    inference_in_queue: Option<Duration>,
+    output_processed: Option<Duration>,
 }
 
-impl Trace {
-    pub fn start() -> Trace {
+impl ClientTrace {
+    pub fn start() -> ClientTrace {
         let start: Instant = Instant::now();
-        Trace {
+        ClientTrace {
             start,
-            serialization_start: None,
-            dispatch: None,
-            scheduling_start: None,
-            executor_queue: None,
-            executor_start: None,
-            send_response: None,
-            process_response: None,
+            model_proxy_aquired: None,
+            serialization_done: None,
+            inference_in_queue: None,
+            output_processed: None,
         }
     }
-    pub fn elapsed(&self) -> Duration {
-        self.start.elapsed()
-    }
 
-    pub fn record_serialization_start(&mut self) {
-        self.serialization_start = Some(self.start.elapsed())
+    pub fn record_model_proxy_aquired(&mut self) {
+        self.model_proxy_aquired = Some(self.start.elapsed())
     }
-    pub fn record_dispatch(&mut self) {
-        self.dispatch = Some(self.start.elapsed())
+    pub fn record_serialization_done(&mut self) {
+        self.serialization_done = Some(self.start.elapsed())
     }
-    pub fn record_scheduling_start(&mut self) {
-        self.scheduling_start = Some(self.start.elapsed())
+    pub fn record_inference_in_queue(&mut self) {
+        self.inference_in_queue = Some(self.start.elapsed())
     }
-    pub fn record_executor_start(&mut self) {
-        self.executor_start = Some(self.start.elapsed())
+    pub fn record_output_processed(&mut self) {
+        self.output_processed = Some(self.start.elapsed())
     }
-    pub fn record_executor_queue(&mut self) {
-        self.executor_queue = Some(self.start.elapsed())
+}
+
+
+impl ClientTrace {
+    pub fn print_debug(&self) {
+        println!("---\ntime to aquire model config {:?}\n deserialize the proto {:?}\n inference in queue {:?}\n output is processed {:?}", 
+            self.model_proxy_aquired,
+            self.serialization_done.unwrap() - self.model_proxy_aquired.unwrap(),
+            self.inference_in_queue.unwrap() - self.serialization_done.unwrap(),
+            self.output_processed.unwrap() - self.inference_in_queue.unwrap(),
+        )
     }
-    pub fn record_send_response(&mut self) {
-        self.send_response = Some(self.start.elapsed())
-    }
-    pub fn record_process_response(&mut self) {
-        self.process_response = Some(self.start.elapsed())
+}
+
+
+pub struct BatchTrace {
+    pub batch_first_open: RefCell<std::time::Instant>,
+    pub batch_complete: RefCell<std::time::Duration>,
+    batch_inference_start: RefCell<std::time::Duration>,
+    batch_inference_done: RefCell<std::time::Duration>,
+    batch_released: RefCell<std::time::Duration>,
+}
+
+impl BatchTrace {
+    fn print_debug(&self) {
+        println!("---\ntime to complete batch {:?}\n picked by executor {:?}\n inference duration {:?}\n time to gather output {:?}", 
+            self.batch_complete.borrow(),
+            *self.batch_inference_start.borrow() - *self.batch_complete.borrow(),
+            *self.batch_inference_done.borrow() - *self.batch_inference_start.borrow(),
+            *self.batch_released.borrow() - *self.batch_inference_done.borrow(),
+        )
     }
 }

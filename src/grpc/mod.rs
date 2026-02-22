@@ -13,7 +13,7 @@ use pajamax::status::{Code, Status};
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
 use crate::scheduler::ModelProxy;
 use crate::tensor::batched_tensor::dyntensor_from_bytes;
-use crate::tracing::Trace;
+use crate::tracing::ClientTrace;
 
 #[derive(Clone)]
 pub struct TritonService {
@@ -88,7 +88,7 @@ impl GrpcInferenceService for TritonService {
     }
 
     async fn model_infer(&self, request: ModelInferRequest) -> Result<ModelInferResponse, Status> {
-        let mut trace = Trace::start();
+        let mut trace = ClientTrace::start();
 
         let models = self.loaded_models.load();
 
@@ -104,7 +104,7 @@ impl GrpcInferenceService for TritonService {
 
         let mut inputs = HashMap::new();
 
-        trace.record_serialization_start();
+        trace.record_model_proxy_aquired();
         request
             .inputs
             .iter()
@@ -125,8 +125,8 @@ impl GrpcInferenceService for TritonService {
                 inputs.insert(req_input.name.clone(), tensor);
             });
 
-        trace.record_dispatch();
-        let inference_outputs = proxy.data.infer(&inputs).await.unwrap();
+        trace.record_serialization_done();
+        let inference_outputs = proxy.data.infer(&inputs, &mut trace).await.unwrap();
         let mut raw_output: Vec<Vec<u8>> = Vec::new();
 
         let outputs = inference_outputs
@@ -150,6 +150,8 @@ impl GrpcInferenceService for TritonService {
                 }
             })
             .collect();
+        trace.record_output_processed();
+        trace.print_debug();
 
         Ok(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),
