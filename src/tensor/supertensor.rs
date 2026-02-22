@@ -11,15 +11,14 @@ use std::{
 };
 
 use arc_swap::ArcSwap;
-use futures::FutureExt;
 use compio::runtime::time::sleep_until;
-use std::time::Instant;
+use futures::FutureExt;
 use ort::{
-    memory::Allocator, value::{DynTensor, DynTensorValueType, Outlet, ValueRef}
+    memory::Allocator,
+    value::{DynTensor, DynTensorValueType, Outlet, ValueRef},
 };
-use tokio::{
-    sync::{futures::Notified, Notify, RwLock},
-};
+use std::time::Instant;
+use tokio::sync::{futures::Notified, Notify, RwLock};
 
 use crate::tensor::batched_tensor::{BatchableTensor, BatchedOutputs};
 
@@ -234,7 +233,10 @@ impl SuperTensorBuffer {
                 let mut batched_tensors = Vec::with_capacity(capacity);
                 for i in 0..capacity {
                     batched_tensors.push(UnsafeCell::from(BatchableTensor::new(
-                        ty.clone(), shape, batch_size, &Allocator::default(),
+                        ty.clone(),
+                        shape,
+                        batch_size,
+                        &Allocator::default(),
                     )));
                 }
 
@@ -401,8 +403,11 @@ impl SuperTensorBuffer {
         if dist_to_higher > 0 && dist_to_higher < HALF_RANGE {
             let maybe_deadline = tracker.deadline.load_full();
             if let Some(deadline) = *maybe_deadline {
+                let now = Instant::now();
                 tokio::select! {
-                    _ = sleep_until(deadline) => {},
+                    _ = sleep_until(deadline) => {
+                        println!("awaken by sleep after {:?}", now.elapsed())
+                    },
                     _ = notified_full => {},
                 }
             }

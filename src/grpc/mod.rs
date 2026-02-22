@@ -33,26 +33,17 @@ unsafe impl Send for ModelInferResponse {}
 
 #[async_trait::async_trait(?Send)]
 impl GrpcInferenceService for TritonService {
-    async fn server_live(
-        &self,
-        _req: ServerLiveRequest,
-    ) -> Result<ServerLiveResponse, Status> {
+    async fn server_live(&self, _req: ServerLiveRequest) -> Result<ServerLiveResponse, Status> {
         println!("is live?");
         Ok(ServerLiveResponse { live: true })
     }
 
-    async fn server_ready(
-        &self,
-        _req: ServerReadyRequest,
-    ) -> Result<ServerReadyResponse, Status> {
+    async fn server_ready(&self, _req: ServerReadyRequest) -> Result<ServerReadyResponse, Status> {
         println!("is server ready?");
         Ok(ServerReadyResponse { ready: true })
     }
 
-    async fn model_ready(
-        &self,
-        request: ModelReadyRequest,
-    ) -> Result<ModelReadyResponse, Status> {
+    async fn model_ready(&self, request: ModelReadyRequest) -> Result<ModelReadyResponse, Status> {
         println!("is model ready?");
         let _ = request.name.clone();
         let is_ready = false;
@@ -82,13 +73,13 @@ impl GrpcInferenceService for TritonService {
             Some(proxy) => {
                 println!("Got model, responding");
                 Ok(ModelMetadataResponse {
-                name: model_name.clone(),
-                versions: vec![String::from("1")],
-                platform: String::from("onnxruntime_onnx"),
-                inputs: proxy.model_metadata.input_meta.clone(),
-                outputs: proxy.model_metadata.output_meta.clone(),
-            })}
-            ,
+                    name: model_name.clone(),
+                    versions: vec![String::from("1")],
+                    platform: String::from("onnxruntime_onnx"),
+                    inputs: proxy.model_metadata.input_meta.clone(),
+                    outputs: proxy.model_metadata.output_meta.clone(),
+                })
+            }
             None => Err(Status {
                 code: Code::NotFound,
                 message: format!("Model {} not found", model_name),
@@ -96,10 +87,7 @@ impl GrpcInferenceService for TritonService {
         }
     }
 
-    async fn model_infer(
-        &self,
-        request: ModelInferRequest,
-    ) -> Result<ModelInferResponse, Status> {
+    async fn model_infer(&self, request: ModelInferRequest) -> Result<ModelInferResponse, Status> {
         let mut trace = Trace::start();
 
         let models = self.loaded_models.load();

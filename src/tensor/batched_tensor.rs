@@ -164,7 +164,12 @@ impl BatchedTensor {
 }
 
 impl BatchableTensor {
-    pub fn new(data_type: TensorElementType, shape: &Shape, batch_size: usize, allocator: &Allocator) -> BatchableTensor {
+    pub fn new(
+        data_type: TensorElementType,
+        shape: &Shape,
+        batch_size: usize,
+        allocator: &Allocator,
+    ) -> BatchableTensor {
         assert_eq!(shape[0], -1, "Shape is not dynamic");
         let mut batch_shape = shape.clone();
         batch_shape[0] = batch_size as i64;

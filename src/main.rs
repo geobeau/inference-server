@@ -11,15 +11,15 @@ use ort::{
     environment::{EnvironmentBuilder, GlobalThreadPoolOptions},
     execution_providers::{CPUExecutionProvider, CUDAExecutionProvider, OpenVINOExecutionProvider},
     memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
-    session::{Session, builder::GraphOptimizationLevel}, value::Tensor,
+    session::{builder::GraphOptimizationLevel, Session},
+    value::Tensor,
 };
 
 use crate::{
     grpc::{
         inference::{
-            GrpcInferenceServiceServer,
-            model_metadata_response::TensorMetadata, DataType, ModelConfig, ModelInput,
-            ModelOutput,
+            model_metadata_response::TensorMetadata, DataType, GrpcInferenceServiceServer,
+            ModelConfig, ModelInput, ModelOutput,
         },
         TritonService,
     },
@@ -35,9 +35,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let batch_size = 64;
     let capacity = 64;
 
-    let cuda_provider = CUDAExecutionProvider::default().with_device_id(0).build().error_on_failure();
-    let thread_pool = GlobalThreadPoolOptions::default().with_intra_threads(4).unwrap().with_spin_control(false).unwrap();
-    ort::init().with_execution_providers([cuda_provider]).with_global_thread_pool(thread_pool).commit();
+    let cuda_provider = CUDAExecutionProvider::default()
+        .with_device_id(0)
+        .build()
+        .error_on_failure();
+    let thread_pool = GlobalThreadPoolOptions::default()
+        .with_intra_threads(4)
+        .unwrap()
+        .with_spin_control(false)
+        .unwrap();
+    ort::init()
+        .with_execution_providers([cuda_provider])
+        .with_global_thread_pool(thread_pool)
+        .commit();
 
     // Create all sessions and extract metadata from the first one
     let mut sessions = Vec::with_capacity(num_executors);
@@ -215,7 +225,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let loaded_models = Arc::new(ArcSwap::from_pointee(model_map));
 
     // Distribute executors to cores round-robin
-    let mut per_core_sessions: Vec<Vec<(usize, Session)>> = (0..num_cores).map(|_| Vec::new()).collect();
+    let mut per_core_sessions: Vec<Vec<(usize, Session)>> =
+        (0..num_cores).map(|_| Vec::new()).collect();
     for (i, session) in sessions.into_iter().enumerate() {
         per_core_sessions[i % num_cores].push((i, session));
     }
@@ -238,7 +249,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let handle = std::thread::Builder::new()
             .name(format!("core-{core_id}"))
             .spawn(move || {
+                let mut proactor = compio::driver::ProactorBuilder::new();
+                // configs taken from apache iggy
+                proactor
+                    .capacity(4096)
+                    .coop_taskrun(true)
+                    .taskrun_flag(true);
+
                 let rt = compio::runtime::RuntimeBuilder::new()
+                    .with_proactor(proactor.to_owned())
+                    .event_interval(128)
                     .build()
                     .expect("failed to build compio runtime");
 
@@ -253,13 +273,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 model: model_proxy,
                             };
                             executor.run().await;
-                        }).detach();
+                        })
+                        .detach();
                     }
 
                     // Run pajamax listener on the same runtime
-                    let service = GrpcInferenceServiceServer::new(
-                        TritonService::new(loaded_models),
-                    );
+                    let service =
+                        GrpcInferenceServiceServer::new(TritonService::new(loaded_models));
                     let services: Vec<std::rc::Rc<dyn pajamax::PajamaxService>> =
                         vec![std::rc::Rc::new(service)];
                     pajamax::connection::accept_loop(services, config, addr)
