@@ -42,6 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let thread_pool = GlobalThreadPoolOptions::default()
         .with_intra_threads(4)
         .unwrap()
+        .with_inter_threads(4).unwrap()
         .with_spin_control(false)
         .unwrap();
     ort::init()
