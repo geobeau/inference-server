@@ -34,7 +34,7 @@ pub mod model_rate_limiter {
     /// @@
     /// @@     The resource property.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct Resource {
         /// @@  .. cpp:var:: string name
         /// @@
@@ -157,7 +157,7 @@ pub mod model_instance_group {
     /// @@
     /// @@     A secondary device required for a model instance.
     /// @@
-    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct SecondaryDevice {
         /// @@  .. cpp:var:: SecondaryDeviceKind kind
         /// @@
@@ -295,7 +295,7 @@ pub mod model_instance_group {
 /// @@
 /// @@   Reshape specification for input and output tensors.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelTensorReshape {
     /// @@  .. cpp:var:: int64 shape (repeated)
     /// @@
@@ -309,7 +309,7 @@ pub struct ModelTensorReshape {
 /// @@
 /// @@   An input required by the model.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelInput {
     /// @@  .. cpp:var:: string name
     /// @@
@@ -454,7 +454,7 @@ pub mod model_input {
 /// @@
 /// @@   An output produced by the model.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelOutput {
     /// @@  .. cpp:var:: string name
     /// @@
@@ -514,7 +514,7 @@ pub struct ModelOutput {
 /// @@     A batch input is an additional input that must be added by
 /// @@     the backend based on all the requests in a batch.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct BatchInput {
     /// @@    .. cpp:var:: Kind kind
     /// @@
@@ -661,7 +661,7 @@ pub mod batch_input {
 /// @@   A batch output is an output produced by the model that must be handled
 /// @@   differently by the backend based on all the requests in a batch.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct BatchOutput {
     /// @@  .. cpp:var:: string target_name (repeated)
     /// @@
@@ -739,7 +739,7 @@ pub mod batch_output {
 /// @@   Policy indicating which versions of a model should be made
 /// @@   available by the inference server.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelVersionPolicy {
     /// @@  .. cpp:var:: oneof policy_choice
     /// @@
@@ -756,7 +756,7 @@ pub mod model_version_policy {
     /// @@     Serve only the latest version(s) of a model. This is
     /// @@     the default policy.
     /// @@
-    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct Latest {
         /// @@    .. cpp:var:: uint32 num_versions
         /// @@
@@ -772,13 +772,13 @@ pub mod model_version_policy {
     /// @@
     /// @@     Serve all versions of the model.
     /// @@
-    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct All {}
     /// @@  .. cpp:var:: message Specific
     /// @@
     /// @@     Serve only specific versions of the model.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct Specific {
         /// @@    .. cpp:var:: int64 versions (repeated)
         /// @@
@@ -792,7 +792,7 @@ pub mod model_version_policy {
     /// @@     Each model must implement only a single version policy. The
     /// @@     default policy is 'Latest'.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
     pub enum PolicyChoice {
         /// @@    .. cpp:var:: Latest latest
         /// @@
@@ -905,7 +905,7 @@ pub mod model_optimization_policy {
     /// @@     to enabling all optimizations, -1 enables only basic optimizations,
     /// @@     +1 enables only basic and extended optimizations.
     /// @@
-    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct Graph {
         /// @@    .. cpp:var:: int32 level
         /// @@
@@ -1012,7 +1012,7 @@ pub mod model_optimization_policy {
             /// @@
             /// @@         Specification of tensor dimension.
             /// @@
-            #[derive(Clone, PartialEq, ::prost::Message)]
+            #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
             pub struct Shape {
                 /// @@        .. cpp:var:: int64 dim (repeated)
                 /// @@
@@ -1158,7 +1158,7 @@ pub mod model_optimization_policy {
     /// @@     memory, and from pinned memory to GPU memory. Similarly, pinned
     /// @@     memory will be used for delivering the outputs.
     /// @@
-    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct PinnedMemoryBuffer {
         /// @@    .. cpp:var:: bool enable
         /// @@
@@ -1231,7 +1231,7 @@ pub mod model_optimization_policy {
 /// @@
 /// @@   Queue policy for inference requests.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelQueuePolicy {
     /// @@
     /// @@  .. cpp:var:: TimeoutAction timeout_action
@@ -1618,7 +1618,7 @@ pub mod model_sequence_batching {
     /// @@
     /// @@     Settings used to initialize data for implicit state.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct InitialState {
         /// @@      .. cpp:var:: DataType data_type
         /// @@
@@ -1652,7 +1652,7 @@ pub mod model_sequence_batching {
         /// @@
         /// @@         Specify how the initial state data is generated.
         /// @@
-        #[derive(Clone, PartialEq, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
         pub enum StateData {
             /// @@
             /// @@      .. cpp:var:: bool zero_data
@@ -1789,7 +1789,7 @@ pub mod model_sequence_batching {
     /// @@     not guaranteed to be assigned to the same batch slot for
     /// @@     all inference requests of that sequence.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct StrategyOldest {
         /// @@    .. cpp:var:: int32 max_candidate_sequences
         /// @@
@@ -1941,7 +1941,7 @@ pub mod model_ensembling {
 /// @@
 /// @@   A model parameter.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelParameter {
     /// @@  .. cpp:var:: string string_value
     /// @@
@@ -2004,7 +2004,7 @@ pub mod model_warmup {
     /// @@
     /// @@     Meta data associated with an input.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct Input {
         /// @@    .. cpp:var:: DataType data_type
         /// @@
@@ -2035,7 +2035,7 @@ pub mod model_warmup {
         /// @@       data type and 'random_data' is set, the data generation will fall
         /// @@       back to 'zero_data'.
         /// @@
-        #[derive(Clone, PartialEq, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
         pub enum InputDataType {
             /// @@
             /// @@    .. cpp:var:: bool zero_data
@@ -2074,7 +2074,7 @@ pub mod model_warmup {
 /// @@
 /// @@    The metadata of libraries providing custom operations for this model.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelOperations {
     /// @@  .. cpp:var:: string op_library_filename (repeated)
     /// @@
@@ -2090,7 +2090,7 @@ pub struct ModelOperations {
 /// @@    The specification that describes the nature of transactions
 /// @@    to be expected from the model.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelTransactionPolicy {
     /// @@  .. cpp:var:: bool decoupled
     /// @@
@@ -2153,7 +2153,7 @@ pub mod model_repository_agents {
 /// @@
 /// @@   The response cache setting for the model.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelResponseCache {
     /// @@
     /// @@  .. cpp::var:: bool enable
@@ -2214,7 +2214,7 @@ pub mod model_metrics {
         /// @@
         /// @@     Specify metrics to be overridden with metric_option.
         /// @@
-        #[derive(Clone, PartialEq, ::prost::Message)]
+        #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
         pub struct MetricIdentifier {
             /// @@  .. cpp:var:: string family
             /// @@
@@ -2584,14 +2584,14 @@ impl DataType {
 /// @@
 /// @@   Request message for ServerLive.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ServerLiveRequest {}
 /// @@
 /// @@.. cpp:var:: message ServerLiveResponse
 /// @@
 /// @@   Response message for ServerLive.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ServerLiveResponse {
     /// @@
     /// @@  .. cpp:var:: bool live
@@ -2606,14 +2606,14 @@ pub struct ServerLiveResponse {
 /// @@
 /// @@   Request message for ServerReady.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ServerReadyRequest {}
 /// @@
 /// @@.. cpp:var:: message ServerReadyResponse
 /// @@
 /// @@   Response message for ServerReady.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ServerReadyResponse {
     /// @@
     /// @@  .. cpp:var:: bool ready
@@ -2628,7 +2628,7 @@ pub struct ServerReadyResponse {
 /// @@
 /// @@   Request message for ModelReady.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelReadyRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -2650,7 +2650,7 @@ pub struct ModelReadyRequest {
 /// @@
 /// @@   Response message for ModelReady.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelReadyResponse {
     /// @@
     /// @@  .. cpp:var:: bool ready
@@ -2665,14 +2665,14 @@ pub struct ModelReadyResponse {
 /// @@
 /// @@   Request message for ServerMetadata.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ServerMetadataRequest {}
 /// @@
 /// @@.. cpp:var:: message ServerMetadataResponse
 /// @@
 /// @@   Response message for ServerMetadata.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ServerMetadataResponse {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -2701,7 +2701,7 @@ pub struct ServerMetadataResponse {
 /// @@
 /// @@   Request message for ModelMetadata.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelMetadataRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -2769,7 +2769,7 @@ pub mod model_metadata_response {
     /// @@
     /// @@     Metadata for a tensor.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct TensorMetadata {
         /// @@
         /// @@    .. cpp:var:: string name
@@ -3219,7 +3219,7 @@ pub mod model_infer_response {
 /// @@
 /// @@   Request message for ModelConfig.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelConfigRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -3256,7 +3256,7 @@ pub struct ModelConfigResponse {
 /// @@
 /// @@   Request message for ModelStatistics.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelStatisticsRequest {
     /// @@  .. cpp:var:: string name
     /// @@
@@ -3278,7 +3278,7 @@ pub struct ModelStatisticsRequest {
 /// @@
 /// @@   Statistic recording a cumulative duration metric.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct StatisticDuration {
     /// @@  .. cpp:var:: uint64 count
     /// @@
@@ -3298,7 +3298,7 @@ pub struct StatisticDuration {
 /// @@
 /// @@   Inference statistics.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct InferStatistics {
     /// @@  .. cpp:var:: StatisticDuration success
     /// @@
@@ -3395,7 +3395,7 @@ pub struct InferStatistics {
 /// @@
 /// @@   Statistics per response.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct InferResponseStatistics {
     /// @@  .. cpp:var:: StatisticDuration compute_infer
     /// @@
@@ -3441,7 +3441,7 @@ pub struct InferResponseStatistics {
 /// @@
 /// @@   Inference batch statistics.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct InferBatchStatistics {
     /// @@  .. cpp:var:: uint64 batch_size
     /// @@
@@ -3480,7 +3480,7 @@ pub struct InferBatchStatistics {
 /// @@
 /// @@   Memory usage.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct MemoryUsage {
     /// @@  .. cpp:var:: string type
     /// @@
@@ -3617,7 +3617,7 @@ pub struct ModelStatisticsResponse {
 /// @@
 /// @@   An model repository parameter value.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ModelRepositoryParameter {
     /// @@  .. cpp:var:: oneof parameter_choice
     /// @@
@@ -3636,7 +3636,7 @@ pub mod model_repository_parameter {
     /// @@     The parameter value can be a string, an int64 or
     /// @@     a boolean
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
     pub enum ParameterChoice {
         /// @@    .. cpp:var:: bool bool_param
         /// @@
@@ -3669,7 +3669,7 @@ pub mod model_repository_parameter {
 /// @@
 /// @@   Request message for RepositoryIndex.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct RepositoryIndexRequest {
     /// @@  .. cpp:var:: string repository_name
     /// @@
@@ -3707,7 +3707,7 @@ pub mod repository_index_response {
     /// @@
     /// @@     Index entry for a model.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct ModelIndex {
         /// @@
         /// @@    .. cpp:var:: string name
@@ -3773,7 +3773,7 @@ pub struct RepositoryModelLoadRequest {
 /// @@
 /// @@   Response message for RepositoryModelLoad.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct RepositoryModelLoadResponse {}
 /// @@
 /// @@.. cpp:var:: message RepositoryModelUnloadRequest
@@ -3810,14 +3810,14 @@ pub struct RepositoryModelUnloadRequest {
 /// @@
 /// @@   Response message for RepositoryModelUnload.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct RepositoryModelUnloadResponse {}
 /// @@
 /// @@.. cpp:var:: message SystemSharedMemoryStatusRequest
 /// @@
 /// @@   Request message for SystemSharedMemoryStatus.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SystemSharedMemoryStatusRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -3854,7 +3854,7 @@ pub mod system_shared_memory_status_response {
     /// @@
     /// @@     Status for a shared memory region.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct RegionStatus {
         /// @@
         /// @@    .. cpp:var:: string name
@@ -3890,7 +3890,7 @@ pub mod system_shared_memory_status_response {
 /// @@
 /// @@   Request message for SystemSharedMemoryRegister.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SystemSharedMemoryRegisterRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -3925,14 +3925,14 @@ pub struct SystemSharedMemoryRegisterRequest {
 /// @@
 /// @@   Response message for SystemSharedMemoryRegister.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SystemSharedMemoryRegisterResponse {}
 /// @@
 /// @@.. cpp:var:: message SystemSharedMemoryUnregisterRequest
 /// @@
 /// @@   Request message for SystemSharedMemoryUnregister.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SystemSharedMemoryUnregisterRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -3948,14 +3948,14 @@ pub struct SystemSharedMemoryUnregisterRequest {
 /// @@
 /// @@   Response message for SystemSharedMemoryUnregister.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SystemSharedMemoryUnregisterResponse {}
 /// @@
 /// @@.. cpp:var:: message CudaSharedMemoryStatusRequest
 /// @@
 /// @@   Request message for CudaSharedMemoryStatus.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CudaSharedMemoryStatusRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -3992,7 +3992,7 @@ pub mod cuda_shared_memory_status_response {
     /// @@
     /// @@     Status for a shared memory region.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct RegionStatus {
         /// @@
         /// @@    .. cpp:var:: string name
@@ -4020,7 +4020,7 @@ pub mod cuda_shared_memory_status_response {
 /// @@
 /// @@   Request message for CudaSharedMemoryRegister.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CudaSharedMemoryRegisterRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -4053,14 +4053,14 @@ pub struct CudaSharedMemoryRegisterRequest {
 /// @@
 /// @@   Response message for CudaSharedMemoryRegister.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CudaSharedMemoryRegisterResponse {}
 /// @@
 /// @@.. cpp:var:: message CudaSharedMemoryUnregisterRequest
 /// @@
 /// @@   Request message for CudaSharedMemoryUnregister.
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CudaSharedMemoryUnregisterRequest {
     /// @@
     /// @@  .. cpp:var:: string name
@@ -4076,7 +4076,7 @@ pub struct CudaSharedMemoryUnregisterRequest {
 /// @@
 /// @@   Response message for CudaSharedMemoryUnregister.
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CudaSharedMemoryUnregisterResponse {}
 /// @@
 /// @@.. cpp:var:: message TraceSettingRequest
@@ -4113,7 +4113,7 @@ pub mod trace_setting_request {
     /// @@     If no value is provided, the setting will be clear and
     /// @@     the global setting value will be used.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct SettingValue {
         /// @@
         /// @@    .. cpp:var:: string value (repeated)
@@ -4149,7 +4149,7 @@ pub mod trace_setting_response {
     /// @@
     /// @@     The values to be associated with a trace setting.
     /// @@
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct SettingValue {
         /// @@
         /// @@    .. cpp:var:: string value (repeated)
@@ -4179,14 +4179,14 @@ pub struct LogSettingsRequest {
 }
 /// Nested message and enum types in `LogSettingsRequest`.
 pub mod log_settings_request {
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct SettingValue {
         #[prost(oneof = "setting_value::ParameterChoice", tags = "1, 2, 3")]
         pub parameter_choice: ::core::option::Option<setting_value::ParameterChoice>,
     }
     /// Nested message and enum types in `SettingValue`.
     pub mod setting_value {
-        #[derive(Clone, PartialEq, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
         pub enum ParameterChoice {
             /// @@    .. cpp:var:: bool bool_param
             /// @@
@@ -4228,14 +4228,14 @@ pub struct LogSettingsResponse {
 }
 /// Nested message and enum types in `LogSettingsResponse`.
 pub mod log_settings_response {
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct SettingValue {
         #[prost(oneof = "setting_value::ParameterChoice", tags = "1, 2, 3")]
         pub parameter_choice: ::core::option::Option<setting_value::ParameterChoice>,
     }
     /// Nested message and enum types in `SettingValue`.
     pub mod setting_value {
-        #[derive(Clone, PartialEq, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
         pub enum ParameterChoice {
             /// @@    .. cpp:var:: bool bool_param
             /// @@

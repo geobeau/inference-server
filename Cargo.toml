@@ -9,16 +9,17 @@ edition = "2021"
 tokio = { version = "1.47.0", features = ["full"] }
 compio = { version = "0.18", features = ["runtime", "time"] }
 criterion = "0.5.1"
-ort = { git = "https://github.com/pykeio/ort", branch = "main", features = [ "cuda", "load-dynamic"] }
-ort-sys = { git = "https://github.com/pykeio/ort", branch = "main", default-features = false }
+ort = { git = "https://github.com/pykeio/ort", rev = "b57e457d5b0f56aad6a093c081aee49c179c3fcb", features = [ "cuda", "load-dynamic"] }
+ort-sys = { git = "https://github.com/pykeio/ort", rev = "b57e457d5b0f56aad6a093c081aee49c179c3fcb", default-features = false }
 rand = "0.9.1"
 futures = "0.3.31"
 # S3 SDK crate (see section below for choice)
 rust-s3 = "0.35"    # for example, using rust-s3 library
 # GRPC Stuff
-pajamax = { git = "https://github.com/geobeau/pajamax", branch = "main"}
-prost = "0.13"
-prost-types = "0.13"
+#pajamax = { git = "https://github.com/geobeau/pajamax", branch = "main"}
+pajamax = { path = "../pajamax/pajamax"}
+prost = "0.14"
+prost-types = "0.14"
 async-trait = "0.1"
 local-sync = "0.1"
 # console-subscriber = "0.4.1"
@@ -32,5 +33,5 @@ opt-level = 2
 panic = 'abort'
 
 [build-dependencies]
-pajamax-build = { path = "../pajamax/pajamax-build" }
-prost-build = "0.13"
+pajamax-build = { path = "../pajamax/pajamax-build"}
+prost-build = "0.14"
