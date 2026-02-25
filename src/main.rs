@@ -5,6 +5,7 @@ mod tensor;
 mod tracing;
 use arc_swap::ArcSwap;
 use log::info;
+use pajamax::{Server, serve};
 use std::{collections::HashMap, sync::Arc};
 
 use ort::{
@@ -242,14 +243,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn one thread per core, each running executors + pajamax listener on the same compio runtime
     let mut handles = Vec::new();
+
+    let services: Vec<Box<dyn Fn() -> std::rc::Rc<dyn pajamax::PajamaxService> + Send + Sync>> =
+        vec![Box::new(move || {
+            std::rc::Rc::new(GrpcInferenceServiceServer::new(TritonService::new(
+                loaded_models.clone(),
+            )))
+        })];
+    let grpc_server = Server::new(services, config, addr.to_string());
+
     for (core_id, core_sessions) in per_core_sessions.into_iter().enumerate() {
         let model_proxy = model_proxy.clone();
-        let loaded_models = loaded_models.clone();
-        let addr = addr.to_string();
-
+        let server = grpc_server.clone();
         let handle = std::thread::Builder::new()
             .name(format!("core-{core_id}"))
             .spawn(move || {
+                
                 let mut proactor = compio::driver::ProactorBuilder::new();
                 // configs taken from apache iggy
                 proactor
@@ -278,15 +287,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .detach();
                     }
 
-                    // Run pajamax listener on the same runtime
-                    let service =
-                        GrpcInferenceServiceServer::new(TritonService::new(loaded_models));
-                    let services: Vec<std::rc::Rc<dyn pajamax::PajamaxService>> =
-                        vec![std::rc::Rc::new(service)];
-                    pajamax::connection::accept_loop(services, config, addr)
-                        .await
-                        .expect("accept loop failed");
-                });
+                    serve(server).await
+                }).unwrap();
             })
             .unwrap();
         handles.push(handle);
