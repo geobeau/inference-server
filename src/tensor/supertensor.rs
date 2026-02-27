@@ -218,7 +218,7 @@ impl SuperTensorBuffer {
                         ty.clone(),
                         shape,
                         batch_size,
-                        &Allocator::default(),
+                        allocator,
                     )));
                 }
 

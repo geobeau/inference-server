@@ -29,4 +29,11 @@ This prevents uneeded heap allocation and string comparisons.
 We copy each request into a Tensor structure but eventually it is copied back to the supertensor.
 We can try to carry the vec<u8> of the request directly to the supertensor.
 
+Note: not done yet
+
+# Using cuda pinned memory
+
+This will help not having to copy the memory within onnx to move to it to the GPU. The GPU can
+access the cuda memory itself if it's flagged as cuda pinned
+
 
