@@ -9,13 +9,13 @@ use std::{collections::HashMap, vec};
 use arc_swap::ArcSwap;
 use inference::GrpcInferenceService;
 use inference::*;
-use ort::value::{DynTensorValueType, Value};
+use ort::value::{DynTensorValueType, Shape, Value};
 use pajamax::status::{Code, Status};
 use smallvec::SmallVec;
 
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
 use crate::scheduler::ModelProxy;
-use crate::tensor::batched_tensor::dyntensor_from_bytes;
+use crate::tensor::batched_tensor::{TensorBytes, dyntensor_from_bytes};
 use crate::tracing::ClientTrace;
 
 #[derive(Clone)]
@@ -113,16 +113,12 @@ impl GrpcInferenceService for TritonService {
                 .expect("Input not in model")
                 .order
         });
-        let mut inputs: SmallVec<[Value<DynTensorValueType>; 6]> = SmallVec::with_capacity(ordered_inputs.len());
+        let mut inputs: SmallVec<[TensorBytes; 6]> = SmallVec::with_capacity(ordered_inputs.len());
 
         for (i, req_input) in ordered_inputs {
-            let dimensions: Vec<usize> = req_input.shape.iter().map(|s| *s as usize).collect();
-            let tensor = dyntensor_from_bytes(
-                DataType::from_str(&req_input.datatype),
-                &dimensions,
-                &request.raw_input_contents[i],
-            );
-            
+            let dimensions = Shape::new(req_input.shape.clone().into_iter());
+            let tensor = TensorBytes { data_type: DataType::from_str(&req_input.datatype), shape: dimensions, data: &request.raw_input_contents[i] };
+
             inputs.push(tensor);
         }
 
@@ -141,7 +137,7 @@ impl GrpcInferenceService for TritonService {
                     .flat_map(|value| value.to_le_bytes())
                     .collect();
                 raw_output.push(bytes);
-
+                // TODO: cache the metadata to avoid recomputing everytime
                 InferOutputTensor {
                     name: String::from(key),
                     datatype: DataType::from(*data_type).as_str_name().to_string(),

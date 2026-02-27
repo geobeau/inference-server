@@ -20,7 +20,7 @@ use smallvec::SmallVec;
 use std::time::Instant;
 use tokio::sync::{futures::Notified, Notify, RwLock};
 
-use crate::{tensor::batched_tensor::{BatchableTensor, BatchedOutputs}, tracing::ClientTrace};
+use crate::{tensor::batched_tensor::{BatchableTensor, BatchedOutputs, TensorBytes}, tracing::ClientTrace};
 
 const HALF_RANGE: usize = usize::MAX / 2;
 
@@ -272,7 +272,7 @@ impl SuperTensorBuffer {
 
     pub async fn infer(
         &self,
-        data: &[DynTensor],
+        data: &[TensorBytes<'_>],
         trace: &mut ClientTrace,
     ) -> Result<HashMap<String, DynTensor>, usize> {
         loop {
@@ -306,7 +306,7 @@ impl SuperTensorBuffer {
     fn insert_tensors_at(
         &self,
         idx: RingBufferIndex,
-        data: &[DynTensor],
+        data: &[TensorBytes<'_>],
     ) -> WriteReservation {
         // batch_slot is the index of the slot within a batch
         // Used to track if it's the first or last reservation on the batch
@@ -319,7 +319,7 @@ impl SuperTensorBuffer {
         self.input_tensors.iter().enumerate().for_each(|(i, tensors)| {
             unsafe {
                 // Isolation of portions of the vector is guaranteed by reserved_slots atomics
-                (&mut *tensors[batch_slot].get()).copy_at(batch_slot, &data[i])
+                (&mut *tensors[batch_slot].get()).copy_at_from_tensorbytes(batch_slot, &data[i])
             }
         });
         if batch_slot == 0 {
