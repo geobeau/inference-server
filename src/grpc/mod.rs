@@ -3,12 +3,15 @@ pub mod inference;
 
 use std::ops::Deref;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 use std::{collections::HashMap, vec};
 
 use arc_swap::ArcSwap;
 use inference::GrpcInferenceService;
 use inference::*;
+use ort::value::{DynTensorValueType, Value};
 use pajamax::status::{Code, Status};
+use smallvec::SmallVec;
 
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
 use crate::scheduler::ModelProxy;
@@ -101,29 +104,27 @@ impl GrpcInferenceService for TritonService {
                 })
             }
         };
-
-        let mut inputs = HashMap::new();
-
         trace.record_model_proxy_aquired();
-        request
-            .inputs
-            .iter()
-            .enumerate()
-            .for_each(|(i, req_input)| {
-                let dimensions: Vec<usize> = req_input.shape.iter().map(|i| *i as usize).collect();
-                let tensor = dyntensor_from_bytes(
-                    DataType::from_str(&req_input.datatype),
-                    &dimensions,
-                    &request.raw_input_contents[i],
-                );
-                let input_shape = proxy
-                    .model_metadata
-                    .input_set
-                    .get(&req_input.name)
-                    .expect("Input provided not in the model");
-                assert_eq!(tensor.shape(), input_shape, "expected the shape to match");
-                inputs.insert(req_input.name.clone(), tensor);
-            });
+
+        let mut ordered_inputs = request.inputs.iter().enumerate().collect::<Vec<_>>();
+
+        ordered_inputs.sort_by_key(|(_, req_input)| {
+            proxy.model_metadata.input_set.get(&req_input.name)
+                .expect("Input not in model")
+                .order
+        });
+        let mut inputs: SmallVec<[Value<DynTensorValueType>; 6]> = SmallVec::with_capacity(ordered_inputs.len());
+
+        for (i, req_input) in ordered_inputs {
+            let dimensions: Vec<usize> = req_input.shape.iter().map(|s| *s as usize).collect();
+            let tensor = dyntensor_from_bytes(
+                DataType::from_str(&req_input.datatype),
+                &dimensions,
+                &request.raw_input_contents[i],
+            );
+            
+            inputs.push(tensor);
+        }
 
         trace.record_serialization_done();
         let inference_outputs = proxy.data.infer(&inputs, &mut trace).await.unwrap();
@@ -151,7 +152,6 @@ impl GrpcInferenceService for TritonService {
             })
             .collect();
         trace.record_output_processed();
-        trace.print_debug();
 
         Ok(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),

@@ -8,10 +8,17 @@ use crate::{
 };
 
 #[derive(Clone)]
+pub struct ModelInputMetadata {
+    pub shape: Shape,
+    pub order: usize,
+}
+
+
+#[derive(Clone)]
 pub struct ModelMetadata {
     pub input_meta: Vec<TensorMetadata>,
     pub output_meta: Vec<TensorMetadata>,
-    pub input_set: HashMap<String, Shape>,
+    pub input_set: HashMap<String, ModelInputMetadata>,
 }
 
 pub struct ModelProxy {

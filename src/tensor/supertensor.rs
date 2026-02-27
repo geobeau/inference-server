@@ -14,9 +14,9 @@ use arc_swap::ArcSwap;
 use compio::runtime::time::sleep_until;
 use futures::FutureExt;
 use ort::{
-    memory::Allocator,
-    value::{DynTensor, DynTensorValueType, Outlet, ValueRef},
+    memory::Allocator, session::SessionInputValue, value::{DynTensor, DynTensorValueType, Outlet, Value, ValueRef}
 };
+use smallvec::SmallVec;
 use std::time::Instant;
 use tokio::sync::{futures::Notified, Notify, RwLock};
 
@@ -44,7 +44,6 @@ pub struct WriteReservation<'a> {
     slot: usize,
 }
 
-static IN_FLIGHT_REQ: AtomicUsize = AtomicUsize::new(0);
 
 impl WriteReservation<'_> {
     fn new(tracker: &DataTracker, slot: usize) -> WriteReservation<'_> {
@@ -157,7 +156,8 @@ impl PaddedAtomic {
 }
 
 pub struct SuperTensorBuffer {
-    input_tensors: HashMap<String, Vec<UnsafeCell<BatchableTensor>>>,
+    // 6 is taken from STACK_SESSION_INPUTS of ORT
+    input_tensors: Vec<SmallVec<[UnsafeCell<BatchableTensor>; 6]>>,
     trackers: Vec<DataTracker>,
     batch_size: usize,
     capacity: usize,
@@ -199,7 +199,7 @@ impl SuperTensorBuffer {
             if !is_power_of_two(capacity) {
                 panic!("Buffer is not power of 2: {capacity}")
             }
-            let mut input_tensors = HashMap::new();
+            let mut input_tensors = Vec::new();
 
             inputs.iter().for_each(|input| {
                 let (ty, shape) = match &input.dtype() {
@@ -212,8 +212,8 @@ impl SuperTensorBuffer {
                     ort::value::ValueType::Map { key: _, value: _ } => todo!(),
                     ort::value::ValueType::Optional(_value_type) => todo!(),
                 };
-                let mut batched_tensors = Vec::with_capacity(capacity);
-                for i in 0..capacity {
+                let mut batched_tensors = SmallVec::with_capacity(capacity);
+                for _ in 0..capacity {
                     batched_tensors.push(UnsafeCell::from(BatchableTensor::new(
                         ty.clone(),
                         shape,
@@ -222,7 +222,7 @@ impl SuperTensorBuffer {
                     )));
                 }
 
-                input_tensors.insert(input.name().to_string(), batched_tensors);
+                input_tensors.push(batched_tensors);
             });
 
             let mut trackers = Vec::with_capacity(capacity);
@@ -272,7 +272,7 @@ impl SuperTensorBuffer {
 
     pub async fn infer(
         &self,
-        data: &HashMap<String, DynTensor>,
+        data: &[DynTensor],
         trace: &mut ClientTrace,
     ) -> Result<HashMap<String, DynTensor>, usize> {
         loop {
@@ -306,7 +306,7 @@ impl SuperTensorBuffer {
     fn insert_tensors_at(
         &self,
         idx: RingBufferIndex,
-        data: &HashMap<String, DynTensor>,
+        data: &[DynTensor],
     ) -> WriteReservation {
         // batch_slot is the index of the slot within a batch
         // Used to track if it's the first or last reservation on the batch
@@ -316,12 +316,10 @@ impl SuperTensorBuffer {
         //     idx.as_batch_slot_id()
         // );
         let batch_slot = idx.as_batch_slot_id();
-        data.iter().for_each(|(key, value)| {
-            let tensors = self.input_tensors.get(key).unwrap();
-            let val = tensors.get(idx.as_batch_id()).unwrap();
+        self.input_tensors.iter().enumerate().for_each(|(i, tensors)| {
             unsafe {
                 // Isolation of portions of the vector is guaranteed by reserved_slots atomics
-                (&mut *val.get()).copy_at(batch_slot, value)
+                (&mut *tensors[batch_slot].get()).copy_at(batch_slot, &data[i])
             }
         });
         if batch_slot == 0 {
@@ -345,7 +343,7 @@ impl SuperTensorBuffer {
 
     pub async fn execute_on_batch<F>(&self, id: String, f: F)
     where
-        F: AsyncFnOnce(HashMap<String, ValueRef<'_, DynTensorValueType>>) -> BatchedOutputs,
+        F: AsyncFnOnce(&[SessionInputValue]) -> BatchedOutputs,
     {
         let mut current_executor_idx; // Defined as RingBufferIndex
         loop {
@@ -390,7 +388,7 @@ impl SuperTensorBuffer {
                 let now = Instant::now();
                 tokio::select! {
                     _ = sleep_until(deadline) => {
-                        println!("awaken by sleep after {:?}", now.elapsed())
+                        // println!("awaken by sleep after {:?}", now.elapsed())
                     },
                     _ = notified_full => {},
                 }
@@ -410,10 +408,10 @@ impl SuperTensorBuffer {
         tracker: &DataTracker,
         current_executor_idx: &RingBufferIndex<'_>,
     ) where
-        F: AsyncFnOnce(HashMap<String, ValueRef<'_, DynTensorValueType>>) -> BatchedOutputs,
+        F: AsyncFnOnce(&[SessionInputValue]) -> BatchedOutputs,
     {
         let input = self.get_data_view(current_executor_idx);
-        let result = f(input).await;
+        let result = f(&input).await;
         // Put the results in the arc output, to be dispatched to consumers
         tracker.output.load_full().store(Arc::from(Ok(result)));
         tracker.response_ready_notifier.notify_waiters();
@@ -470,14 +468,13 @@ impl SuperTensorBuffer {
     pub fn get_data_view(
         &self,
         current_executor_idx: &RingBufferIndex,
-    ) -> HashMap<String, ValueRef<'_, DynTensorValueType>> {
+    ) -> SmallVec<[SessionInputValue; 6]> {
         unsafe {
-            let mut all_inputs = HashMap::new();
+            let mut all_inputs = SmallVec::new();
             let batch_id = current_executor_idx.as_batch_id();
 
-            self.input_tensors.iter().for_each(|(name, batch_tensors)| {
-                let batch_tensor = batch_tensors.get(batch_id).unwrap();
-                all_inputs.insert(name.clone(), (*batch_tensor.get()).inner_tensor.view());
+            self.input_tensors.iter().for_each(|batch_tensors| {
+                all_inputs.push((*batch_tensors[batch_id].get()).inner_tensor.view().into());
             });
             all_inputs
         }

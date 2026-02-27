@@ -1090,6 +1090,7 @@ dependencies = [
  "prost-types",
  "rand",
  "rust-s3",
+ "smallvec",
  "tokio",
 ]
 

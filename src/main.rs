@@ -18,20 +18,18 @@ use ort::{
 
 use crate::{
     grpc::{
-        inference::{
-            model_metadata_response::TensorMetadata, DataType, GrpcInferenceServiceServer,
-            ModelConfig, ModelInput, ModelOutput,
-        },
-        TritonService,
+        TritonService, inference::{
+            DataType, GrpcInferenceServiceServer, ModelConfig, ModelInput, ModelOutput, model_metadata_response::TensorMetadata
+        }
     },
-    scheduler::ModelMetadata,
+    scheduler::{ModelInputMetadata, ModelMetadata},
     tensor::supertensor::SuperTensorBuffer,
 };
 
 // Current worker that I use is 16 vcpu: 12 is for compio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
 // TODO: make this configurable
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let num_cores = 4;
+    let num_cores = 2;
     let num_executors = 8;
     let batch_size = 64;
     let capacity = 64;
@@ -135,10 +133,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect();
 
             let mut input_set = HashMap::new();
-            let input_metadata = session
+            let inputs_metadata = session
                 .inputs()
                 .iter()
-                .map(|input| {
+                .enumerate()
+                .map(|(usize, input)| {
                     let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
                     let tensor_shape: Vec<i64> = input
                         .dtype()
@@ -149,7 +148,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .collect();
                     let mut input_shape = input.dtype().tensor_shape().unwrap().clone();
                     input_shape[0] = 1;
-                    input_set.insert(input.name().to_string(), input_shape);
+                    println!("{:?} -> ({:?},{:?})", input.name(), tensor_type, tensor_shape);
+                    let input_metadata = ModelInputMetadata { shape: input_shape, order: i };
+                    input_set.insert(input.name().to_string(), input_metadata);
                     TensorMetadata {
                         name: input.name().to_string(),
                         datatype: tensor_type.to_metadata_string(),
@@ -158,7 +159,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .collect();
 
-            let output_metadata = session
+            let outputs_metadata = session
                 .outputs()
                 .iter()
                 .map(|output| {
@@ -179,8 +180,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect();
 
             let model_metadata = ModelMetadata {
-                input_meta: input_metadata,
-                output_meta: output_metadata,
+                input_meta: inputs_metadata,
+                output_meta: outputs_metadata,
                 input_set,
             };
 
