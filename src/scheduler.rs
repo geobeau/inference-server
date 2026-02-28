@@ -13,7 +13,6 @@ pub struct ModelInputMetadata {
     pub order: usize,
 }
 
-
 #[derive(Clone)]
 pub struct ModelMetadata {
     pub input_meta: Vec<TensorMetadata>,

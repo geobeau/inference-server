@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
 use ort::session::{RunOptions, Session};
+use smallvec::SmallVec;
 
-use crate::{scheduler::ModelProxy, tensor::batched_tensor::BatchedOutputs};
+use crate::{
+    scheduler::ModelProxy,
+    tensor::supertensor::SessionValues,
+};
 
 pub struct OnnxExecutor {
     pub id: String,
@@ -26,7 +30,12 @@ impl OnnxExecutor {
                         .unwrap()
                         .await
                         .unwrap();
-                    BatchedOutputs::new(session_outputs)
+                    let mut values: smallvec::SmallVec<[ort::value::Value; 4]> =
+                        SmallVec::with_capacity(session_outputs.len());
+                    session_outputs.into_iter().for_each(|(_, value)| {
+                        values.push(value);
+                    });
+                    SessionValues { values }
                 })
                 .await;
             // println!("executed batch")

@@ -3,19 +3,18 @@ pub mod inference;
 
 use std::ops::Deref;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
 use std::{collections::HashMap, vec};
 
 use arc_swap::ArcSwap;
 use inference::GrpcInferenceService;
 use inference::*;
-use ort::value::{DynTensorValueType, Shape, Value};
+use ort::value::Shape;
 use pajamax::status::{Code, Status};
 use smallvec::SmallVec;
 
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
 use crate::scheduler::ModelProxy;
-use crate::tensor::batched_tensor::{TensorBytes, dyntensor_from_bytes};
+use crate::tensor::batched_tensor::TensorBytes;
 use crate::tracing::ClientTrace;
 
 #[derive(Clone)]
@@ -109,7 +108,10 @@ impl GrpcInferenceService for TritonService {
         let mut ordered_inputs = request.inputs.iter().enumerate().collect::<Vec<_>>();
 
         ordered_inputs.sort_by_key(|(_, req_input)| {
-            proxy.model_metadata.input_set.get(&req_input.name)
+            proxy
+                .model_metadata
+                .input_set
+                .get(&req_input.name)
                 .expect("Input not in model")
                 .order
         });
@@ -117,7 +119,11 @@ impl GrpcInferenceService for TritonService {
 
         for (i, req_input) in ordered_inputs {
             let dimensions = Shape::new(req_input.shape.clone().into_iter());
-            let tensor = TensorBytes { data_type: DataType::from_str(&req_input.datatype), shape: dimensions, data: &request.raw_input_contents[i] };
+            let tensor = TensorBytes {
+                data_type: DataType::from_str(&req_input.datatype),
+                shape: dimensions,
+                data: &request.raw_input_contents[i],
+            };
 
             inputs.push(tensor);
         }
@@ -126,20 +132,14 @@ impl GrpcInferenceService for TritonService {
         let inference_outputs = proxy.data.infer(&inputs, &mut trace).await.unwrap();
         let mut raw_output: Vec<Vec<u8>> = Vec::new();
 
-        let outputs = inference_outputs
+        let output_metadata = inference_outputs.get_data(&mut raw_output).await;
+        let outputs = output_metadata
             .iter()
-            .map(|(key, output)| {
-                let data_type = output.data_type();
-
-                let (shape, serial_data) = output.try_extract_tensor::<f32>().unwrap();
-                let bytes: Vec<u8> = serial_data
-                    .iter()
-                    .flat_map(|value| value.to_le_bytes())
-                    .collect();
-                raw_output.push(bytes);
+            .map(|(data_type, shape)| {
                 // TODO: cache the metadata to avoid recomputing everytime
                 InferOutputTensor {
-                    name: String::from(key),
+                    // TODO URGENT: replace the output name
+                    name: String::from("x"),
                     datatype: DataType::from(*data_type).as_str_name().to_string(),
                     shape: Vec::from(shape.deref()),
                     parameters: HashMap::new(),

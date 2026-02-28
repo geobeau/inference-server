@@ -37,7 +37,6 @@ impl ClientTrace {
     }
 }
 
-
 impl ClientTrace {
     pub fn print_debug(&self) {
         println!("---\ntime to aquire model config {:?}\n deserialize the proto {:?}\n inference in queue {:?}\n output is processed {:?}", 
@@ -48,7 +47,6 @@ impl ClientTrace {
         )
     }
 }
-
 
 pub struct BatchTrace {
     pub batch_first_open: RefCell<std::time::Instant>,

@@ -5,22 +5,23 @@ mod tensor;
 mod tracing;
 use arc_swap::ArcSwap;
 use log::info;
-use pajamax::{Server, serve};
+use pajamax::{serve, Server};
 use std::{collections::HashMap, sync::Arc};
 
 use ort::{
-    environment::{EnvironmentBuilder, GlobalThreadPoolOptions},
-    execution_providers::{CPUExecutionProvider, CUDAExecutionProvider, OpenVINOExecutionProvider},
+    environment::GlobalThreadPoolOptions,
+    execution_providers::CUDAExecutionProvider,
     memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
     session::{builder::GraphOptimizationLevel, Session},
-    value::Tensor,
 };
 
 use crate::{
     grpc::{
-        TritonService, inference::{
-            DataType, GrpcInferenceServiceServer, ModelConfig, ModelInput, ModelOutput, model_metadata_response::TensorMetadata
-        }
+        inference::{
+            model_metadata_response::TensorMetadata, DataType, GrpcInferenceServiceServer,
+            ModelConfig, ModelInput, ModelOutput,
+        },
+        TritonService,
     },
     scheduler::{ModelInputMetadata, ModelMetadata},
     tensor::supertensor::SuperTensorBuffer,
@@ -29,7 +30,7 @@ use crate::{
 // Current worker that I use is 16 vcpu: 12 is for compio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
 // TODO: make this configurable
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let num_cores = 2;
+    let num_cores = 10;
     let num_executors = 8;
     let batch_size = 64;
     let capacity = 64;
@@ -39,9 +40,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .error_on_failure();
     let thread_pool = GlobalThreadPoolOptions::default()
-        .with_intra_threads(4)
+        .with_intra_threads(7)
         .unwrap()
-        .with_inter_threads(4).unwrap()
+        .with_inter_threads(4)
+        .unwrap()
         .with_spin_control(false)
         .unwrap();
     ort::init()
@@ -136,8 +138,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let inputs_metadata = session
                 .inputs()
                 .iter()
-                .enumerate()
-                .map(|(usize, input)| {
+                .map(|input| {
                     let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
                     let tensor_shape: Vec<i64> = input
                         .dtype()
@@ -148,8 +149,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .collect();
                     let mut input_shape = input.dtype().tensor_shape().unwrap().clone();
                     input_shape[0] = 1;
-                    println!("{:?} -> ({:?},{:?})", input.name(), tensor_type, tensor_shape);
-                    let input_metadata = ModelInputMetadata { shape: input_shape, order: i };
+                    println!(
+                        "{:?} -> ({:?},{:?})",
+                        input.name(),
+                        tensor_type,
+                        tensor_shape
+                    );
+                    let input_metadata = ModelInputMetadata {
+                        shape: input_shape,
+                        order: i,
+                    };
                     input_set.insert(input.name().to_string(), input_metadata);
                     TensorMetadata {
                         name: input.name().to_string(),
@@ -259,7 +268,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let handle = std::thread::Builder::new()
             .name(format!("core-{core_id}"))
             .spawn(move || {
-                
                 let mut proactor = compio::driver::ProactorBuilder::new();
                 // configs taken from apache iggy
                 proactor
@@ -289,7 +297,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     serve(server).await
-                }).unwrap();
+                })
+                .unwrap();
             })
             .unwrap();
         handles.push(handle);

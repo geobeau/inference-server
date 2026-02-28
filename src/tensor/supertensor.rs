@@ -1,29 +1,30 @@
 use std::{
-    cell::{Ref, RefCell, UnsafeCell},
-    collections::HashMap,
-    marker,
+    cell::UnsafeCell,
+    cmp::min,
     sync::{
         atomic::{fence, AtomicUsize, Ordering},
         Arc,
     },
     time::Duration,
-    usize,
 };
 
 use arc_swap::ArcSwap;
 use compio::runtime::time::sleep_until;
-use futures::FutureExt;
 use ort::{
-    memory::Allocator, session::SessionInputValue, value::{DynTensor, DynTensorValueType, Outlet, Value, ValueRef}
+    memory::Allocator,
+    session::SessionInputValue,
+    value::{Outlet, Shape, TensorElementType, Value},
 };
 use smallvec::SmallVec;
 use std::time::Instant;
-use tokio::sync::{futures::Notified, Notify, RwLock};
+use tokio::sync::{futures::Notified, Notify};
 
-use crate::{tensor::batched_tensor::{BatchableTensor, BatchedOutputs, TensorBytes}, tracing::ClientTrace};
+use crate::{
+    tensor::batched_tensor::{value_as_byte_slice, BatchableTensor, TensorBytes},
+    tracing::ClientTrace,
+};
 
 const HALF_RANGE: usize = usize::MAX / 2;
-
 
 struct DataTracker {
     // Dirty buffer should not be reused
@@ -32,48 +33,102 @@ struct DataTracker {
     deadline: ArcSwap<Option<Instant>>,
     executor_notifier: ArcSwap<Notify>,
     // TODO: make a proper error state
-    output: ArcSwap<ArcSwap<Result<BatchedOutputs, usize>>>,
+    output: ArcSwap<ArcSwap<Result<SessionValues, usize>>>,
     response_ready_notifier: Notify,
+}
+
+pub struct SessionValues {
+    pub values: SmallVec<[Value; 4]>,
+}
+
+pub struct InferenceResponse<'a> {
+    // 6 is arbitrary
+    outputs: SmallVec<[WriteReservation<'a>; 6]>,
+}
+
+impl<'a> InferenceResponse<'a> {
+    pub fn new() -> InferenceResponse<'a> {
+        InferenceResponse {
+            outputs: SmallVec::new(),
+        }
+    }
+
+    pub fn push(&mut self, reservation: WriteReservation<'a>) {
+        self.outputs.push(reservation);
+    }
+
+    pub async fn get_data(self, data: &mut [Vec<u8>]) -> Vec<(TensorElementType, Shape)> {
+        let mut maybe_metadatas: Option<Vec<(TensorElementType, Shape)>> = None;
+        for output in self.outputs.into_iter() {
+            let batch_metadatas = output.get_result(data).await;
+            match &mut maybe_metadatas {
+                Some(metadatas) => {
+                    batch_metadatas
+                        .iter()
+                        .enumerate()
+                        .for_each(|(i, (_, shape))| {
+                            // Add the shape of all subbatches to the response shape
+                            metadatas[i].1[0] += shape[0]
+                        });
+                }
+                None => maybe_metadatas = Some(batch_metadatas),
+            };
+        }
+        maybe_metadatas.unwrap()
+    }
 }
 
 // Ensure accounting when tasks are canceled
 pub struct WriteReservation<'a> {
     tracker: &'a DataTracker,
-    output: Arc<ArcSwap<Result<BatchedOutputs, usize>>>,
+    output: Arc<ArcSwap<Result<SessionValues, usize>>>,
     response_ready_notified: Notified<'a>,
-    slot: usize,
+    start: usize,
+    end: usize,
 }
 
-
 impl WriteReservation<'_> {
-    fn new(tracker: &DataTracker, slot: usize) -> WriteReservation<'_> {
+    fn new(tracker: &DataTracker, start: usize, end: usize) -> WriteReservation<'_> {
         let response_ready_notified = tracker.response_ready_notifier.notified();
         let output_arc = tracker.output.load_full().clone();
         tracker.written_slots.fetch_add(1, Ordering::Release);
         WriteReservation {
-            tracker: tracker,
-            slot,
+            tracker,
+            start,
+            end,
             output: output_arc,
             response_ready_notified,
         }
     }
 
-    async fn get_result(self) -> HashMap<String, DynTensor> {
+    async fn get_result(self, data: &mut [Vec<u8>]) -> Vec<(TensorElementType, Shape)> {
         // IN_FLIGHT_REQ.fetch_add(1, Ordering::Relaxed);
         self.response_ready_notified.await;
         // let in_flight = IN_FLIGHT_REQ.fetch_sub(1, Ordering::Relaxed);
         // println!("in flight: {}", in_flight - 1);
         let output_ref = self.output.load();
-        let mut slot_output = HashMap::new();
+        let mut metadatas = Vec::new();
         match &output_ref.as_ref() {
             Ok(output) => {
-                output.outputs.iter().for_each(|(name, batch_tensor)| {
-                    slot_output.insert(name.clone(), batch_tensor.pop_at(self.slot));
-                });
+                output
+                    .values
+                    .iter()
+                    .enumerate()
+                    .for_each(|(i, batch_tensor)| {
+                        data[i].extend_from_slice(value_as_byte_slice(
+                            batch_tensor,
+                            self.start,
+                            self.end,
+                        ));
+                        metadatas.push((
+                            *batch_tensor.data_type(),
+                            batch_tensor.shape().clone(),
+                        ));
+                    });
             }
             Err(_) => todo!(),
         }
-        return slot_output;
+        metadatas
     }
 }
 
@@ -83,6 +138,7 @@ fn is_power_of_two(n: usize) -> bool {
 
 /// Useful abstraction to get the correct position within the buffer
 /// Maybe it should be a macro?
+#[derive(Clone)]
 pub struct RingBufferIndex<'a> {
     /// Absolute index on the ringbuffer
     index: usize,
@@ -90,13 +146,13 @@ pub struct RingBufferIndex<'a> {
 }
 
 impl<'a> RingBufferIndex<'a> {
-    fn new(index: usize, atomic_ref: &PaddedAtomic) -> RingBufferIndex {
-        return RingBufferIndex { index, atomic_ref };
+    fn new(index: usize, atomic_ref: &PaddedAtomic) -> RingBufferIndex<'_> {
+        RingBufferIndex { index, atomic_ref }
     }
     /// Get the absolute index, return the raw index, useful for operating on the ring
     /// itself
     fn as_absolute_index(&self) -> usize {
-        return self.index;
+        self.index
     }
 
     /// Return the batch_slot 0 of the next batch in absolute index
@@ -145,7 +201,7 @@ struct PaddedAtomic {
 }
 
 impl PaddedAtomic {
-    pub fn load(&self, order: Ordering) -> RingBufferIndex {
+    pub fn load(&self, order: Ordering) -> RingBufferIndex<'_> {
         RingBufferIndex::new(self.value.load(order), self)
     }
 
@@ -215,7 +271,7 @@ impl SuperTensorBuffer {
                 let mut batched_tensors = SmallVec::with_capacity(capacity);
                 for _ in 0..capacity {
                     batched_tensors.push(UnsafeCell::from(BatchableTensor::new(
-                        ty.clone(),
+                        *ty,
                         shape,
                         batch_size,
                         allocator,
@@ -226,7 +282,7 @@ impl SuperTensorBuffer {
             });
 
             let mut trackers = Vec::with_capacity(capacity);
-            for i in 0..capacity {
+            for _i in 0..capacity {
                 trackers.push(DataTracker {
                     dirty: AtomicUsize::new(0),
                     written_slots: AtomicUsize::new(0),
@@ -274,26 +330,60 @@ impl SuperTensorBuffer {
         &self,
         data: &[TensorBytes<'_>],
         trace: &mut ClientTrace,
-    ) -> Result<HashMap<String, DynTensor>, usize> {
+    ) -> Result<InferenceResponse<'_>, usize> {
         loop {
-            let current_head = self.head.load(Ordering::Relaxed);
+            let mut current_head = self.head.load(Ordering::Relaxed);
             let current_tail = self.tail.load(Ordering::Acquire);
 
             // Check if the ring is full
+            // TODO: make check batch compatible
             if current_head.wrapping_sub(&current_tail) >= self.capacity * self.batch_size {
                 // println!("Buffer full, yielding");
                 self.infer_full_notifier.notified().await;
                 continue;
             }
+            // TODO: validate before that:
+            // - data and shape is not empty
+            // - all inputs have the same batch size
+            let mut client_batch_size = data[0].shape[0] as usize;
 
             match self.head.compare_exchange_weak(
                 current_head.as_absolute_index(),
-                current_head.wrapping_add(1),
+                current_head.wrapping_add(client_batch_size),
             ) {
                 Ok(_) => {
-                    let write_reservation = self.insert_tensors_at(current_head, data);
-                    trace.record_inference_in_queue();
-                    return Ok(write_reservation.get_result().await);
+                    let mut start = 0;
+                    let mut response = InferenceResponse::new();
+                    let batch_id = current_head.as_absolute_index();
+
+                    loop {
+                        let capacity_in_current_batch = current_head
+                            .as_absolute_index()
+                            .wrapping_sub(current_head.as_absolute_batch_higher_bound());
+                        let to_write = min(client_batch_size, capacity_in_current_batch);
+                        let end = start + to_write;
+
+                        trace.record_inference_in_queue();
+                        println!(
+                            "{batch_id} inserting {to_write} tensors into {}",
+                            current_head.as_batch_id()
+                        );
+                        let write_reservation =
+                            self.insert_tensors_at(current_head.clone(), start, end, data);
+                        response.push(write_reservation);
+                        start = end;
+                        client_batch_size -= to_write;
+                        if client_batch_size == 0 {
+                            break;
+                        }
+
+                        current_head = RingBufferIndex {
+                            index: current_head.as_absolute_batch_higher_bound(),
+                            atomic_ref: &self.executor_head,
+                        };
+                    }
+                    // TODO: process all the writes from different buffers
+                    return Ok(response);
                 }
                 Err(_) => {
                     // Another producer won the race, retry the check
@@ -306,8 +396,10 @@ impl SuperTensorBuffer {
     fn insert_tensors_at(
         &self,
         idx: RingBufferIndex,
+        data_start: usize,
+        data_end: usize,
         data: &[TensorBytes<'_>],
-    ) -> WriteReservation {
+    ) -> WriteReservation<'_> {
         // batch_slot is the index of the slot within a batch
         // Used to track if it's the first or last reservation on the batch
         // println!(
@@ -316,12 +408,16 @@ impl SuperTensorBuffer {
         //     idx.as_batch_slot_id()
         // );
         let batch_slot = idx.as_batch_slot_id();
-        self.input_tensors.iter().enumerate().for_each(|(i, tensors)| {
-            unsafe {
-                // Isolation of portions of the vector is guaranteed by reserved_slots atomics
-                (&mut *tensors[batch_slot].get()).copy_at_from_tensorbytes(batch_slot, &data[i])
-            }
-        });
+        self.input_tensors
+            .iter()
+            .enumerate()
+            .for_each(|(i, tensors)| {
+                unsafe {
+                    // Isolation of portions of the vector is guaranteed by reserved_slots atomics
+                    (&mut *tensors[batch_slot].get())
+                        .copy_at_from_tensorbytes(batch_slot, &data[i], data_start, data_end)
+                }
+            });
         if batch_slot == 0 {
             let tracker = self.trackers.get(idx.as_batch_id()).unwrap();
             let deadline = Instant::now() + Duration::from_millis(2);
@@ -332,18 +428,19 @@ impl SuperTensorBuffer {
         fence(Ordering::Release);
 
         let tracker = self.trackers.get(idx.as_batch_id()).unwrap();
-        let reservation = WriteReservation::new(tracker, batch_slot);
+        let reservation =
+            WriteReservation::new(tracker, batch_slot, batch_slot + (data_end - data_start));
         // If the batch is going to be completed, awaken the executor
         if batch_slot == (self.batch_size - 1) || batch_slot == 0 {
             // println!("Notifying executor on {}", idx.as_batch_id());
             tracker.executor_notifier.load_full().notify_one();
         }
-        return reservation;
+        reservation
     }
 
-    pub async fn execute_on_batch<F>(&self, id: String, f: F)
+    pub async fn execute_on_batch<F>(&self, _id: String, f: F)
     where
-        F: AsyncFnOnce(&[SessionInputValue]) -> BatchedOutputs,
+        F: AsyncFnOnce(&[SessionInputValue]) -> SessionValues,
     {
         let mut current_executor_idx; // Defined as RingBufferIndex
         loop {
@@ -385,7 +482,7 @@ impl SuperTensorBuffer {
         if dist_to_higher > 0 && dist_to_higher < HALF_RANGE {
             let maybe_deadline = tracker.deadline.load_full();
             if let Some(deadline) = *maybe_deadline {
-                let now = Instant::now();
+                let _now = Instant::now();
                 tokio::select! {
                     _ = sleep_until(deadline) => {
                         // println!("awaken by sleep after {:?}", now.elapsed())
@@ -408,7 +505,7 @@ impl SuperTensorBuffer {
         tracker: &DataTracker,
         current_executor_idx: &RingBufferIndex<'_>,
     ) where
-        F: AsyncFnOnce(&[SessionInputValue]) -> BatchedOutputs,
+        F: AsyncFnOnce(&[SessionInputValue]) -> SessionValues,
     {
         let input = self.get_data_view(current_executor_idx);
         let result = f(&input).await;
@@ -443,12 +540,11 @@ impl SuperTensorBuffer {
 
             let dirty_state = &self.trackers[tail.as_batch_id()].dirty;
             let dirty = dirty_state.load(Ordering::Acquire);
-            if dirty == 2 {
-                if dirty_state
+            if dirty == 2
+                && dirty_state
                     .compare_exchange_weak(dirty, 0, Ordering::AcqRel, Ordering::Acquire)
                     .is_ok()
-                {
-                    if self
+                    && self
                         .tail
                         .compare_exchange_weak(
                             tail.as_absolute_index(),
@@ -460,15 +556,13 @@ impl SuperTensorBuffer {
                         self.infer_full_notifier.notify_waiters();
                         continue;
                     }
-                }
-            }
             break;
         }
     }
     pub fn get_data_view(
         &self,
         current_executor_idx: &RingBufferIndex,
-    ) -> SmallVec<[SessionInputValue; 6]> {
+    ) -> SmallVec<[SessionInputValue<'_>; 6]> {
         unsafe {
             let mut all_inputs = SmallVec::new();
             let batch_id = current_executor_idx.as_batch_id();
