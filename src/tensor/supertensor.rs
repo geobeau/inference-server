@@ -57,7 +57,7 @@ impl<'a> InferenceResponse<'a> {
         self.outputs.push(reservation);
     }
 
-    pub async fn get_data(self, data: &mut [Vec<u8>]) -> Vec<(TensorElementType, Shape)> {
+    pub async fn get_data(self, data: &mut Vec<Vec<u8>>) -> Vec<(TensorElementType, Shape)> {
         let mut maybe_metadatas: Option<Vec<(TensorElementType, Shape)>> = None;
         for output in self.outputs.into_iter() {
             let batch_metadatas = output.get_result(data).await;
@@ -91,7 +91,7 @@ impl WriteReservation<'_> {
     fn new(tracker: &DataTracker, start: usize, end: usize) -> WriteReservation<'_> {
         let response_ready_notified = tracker.response_ready_notifier.notified();
         let output_arc = tracker.output.load_full().clone();
-        tracker.written_slots.fetch_add(1, Ordering::Release);
+        tracker.written_slots.fetch_add(end - start, Ordering::Release);
         WriteReservation {
             tracker,
             start,
@@ -101,7 +101,7 @@ impl WriteReservation<'_> {
         }
     }
 
-    async fn get_result(self, data: &mut [Vec<u8>]) -> Vec<(TensorElementType, Shape)> {
+    async fn get_result(self, data: &mut Vec<Vec<u8>>) -> Vec<(TensorElementType, Shape)> {
         // IN_FLIGHT_REQ.fetch_add(1, Ordering::Relaxed);
         self.response_ready_notified.await;
         // let in_flight = IN_FLIGHT_REQ.fetch_sub(1, Ordering::Relaxed);
@@ -110,6 +110,10 @@ impl WriteReservation<'_> {
         let mut metadatas = Vec::new();
         match &output_ref.as_ref() {
             Ok(output) => {
+                // Data starts empty and get_result can be called many time, it needs initialization
+                if data.is_empty() {
+                    output.values.iter().for_each(|_| data.push(Vec::new()));
+                }
                 output
                     .values
                     .iter()
@@ -352,27 +356,31 @@ impl SuperTensorBuffer {
                 current_head.wrapping_add(client_batch_size),
             ) {
                 Ok(_) => {
-                    let mut start = 0;
+                    let mut input_start = 0;
                     let mut response = InferenceResponse::new();
                     let batch_id = current_head.as_absolute_index();
 
                     loop {
-                        let capacity_in_current_batch = current_head
-                            .as_absolute_index()
-                            .wrapping_sub(current_head.as_absolute_batch_higher_bound());
+                        let capacity_in_current_batch = current_head.as_absolute_batch_higher_bound()
+                            .wrapping_sub(current_head.as_absolute_index());
+
                         let to_write = min(client_batch_size, capacity_in_current_batch);
-                        let end = start + to_write;
+                
+                        let input_end = input_start + to_write;
 
                         trace.record_inference_in_queue();
-                        println!(
-                            "{batch_id} inserting {to_write} tensors into {}",
-                            current_head.as_batch_id()
-                        );
+                        // println!(
+                        //     "{batch_id} inserting {to_write} tensors into {} ({input_start} -> {input_end}) ({to_write} = min({client_batch_size},{capacity_in_current_batch}) head {} hb:{}",
+                        //     current_head.as_batch_id(),
+                        //     current_head.as_absolute_index(),
+                        //     current_head.as_absolute_batch_higher_bound(),
+                        // );
                         let write_reservation =
-                            self.insert_tensors_at(current_head.clone(), start, end, data);
+                            self.insert_tensors_at(current_head.clone(), input_start, input_end, data);
                         response.push(write_reservation);
-                        start = end;
+                        input_start = input_end;
                         client_batch_size -= to_write;
+
                         if client_batch_size == 0 {
                             break;
                         }
@@ -414,8 +422,10 @@ impl SuperTensorBuffer {
             .for_each(|(i, tensors)| {
                 unsafe {
                     // Isolation of portions of the vector is guaranteed by reserved_slots atomics
-                    (&mut *tensors[batch_slot].get())
-                        .copy_at_from_tensorbytes(batch_slot, &data[i], data_start, data_end)
+                    let slice = data[i].slice_dim0(data_start, data_end);
+                    let batch_tensor = (&mut *tensors[batch_slot].get());
+                    // println!("Slicing of len {} -> {} between {data_start} and {data_end}", slice.len(), batch_tensor.inner_tensor.shape().num_elements() );
+                    batch_tensor.copy_at_from_bytes(batch_slot, slice)
                 }
             });
         if batch_slot == 0 {
