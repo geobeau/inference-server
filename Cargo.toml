@@ -13,8 +13,9 @@ ort = { git = "https://github.com/pykeio/ort", rev = "b57e457d5b0f56aad6a093c081
 ort-sys = { git = "https://github.com/pykeio/ort", rev = "b57e457d5b0f56aad6a093c081aee49c179c3fcb", default-features = false }
 rand = "0.9.1"
 futures = "0.3.31"
-# S3 SDK crate (see section below for choice)
-rust-s3 = "0.35"    # for example, using rust-s3 library
+fusio = { version = "0.6", features = ["tokio-http", "aws"] }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
 # GRPC Stuff
 #pajamax = { git = "https://github.com/geobeau/pajamax", branch = "main"}
 pajamax = { path = "../pajamax/pajamax"}

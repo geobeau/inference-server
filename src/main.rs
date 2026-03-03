@@ -1,5 +1,6 @@
 mod grpc;
 mod loader;
+mod model_repository;
 mod scheduler;
 mod tensor;
 mod tracing;
