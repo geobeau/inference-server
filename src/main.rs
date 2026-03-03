@@ -1,40 +1,34 @@
 mod grpc;
 mod loader;
 mod model_repository;
+mod model_runtime;
 mod scheduler;
 mod tensor;
 mod tracing;
 use arc_swap::ArcSwap;
 use log::info;
 use pajamax::{serve, Server};
+use std::path::PathBuf;
 use std::{collections::HashMap, sync::Arc};
 
 use ort::{
     environment::GlobalThreadPoolOptions,
     execution_providers::CUDAExecutionProvider,
-    memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
-    session::{builder::GraphOptimizationLevel, Session},
 };
 
 use crate::{
     grpc::{
-        inference::{
-            model_metadata_response::TensorMetadata, DataType, GrpcInferenceServiceServer,
-            ModelConfig, ModelInput, ModelOutput,
-        },
+        inference::GrpcInferenceServiceServer,
         TritonService,
     },
-    scheduler::{ModelInputMetadata, ModelMetadata},
-    tensor::supertensor::SuperTensorBuffer,
+    model_repository::config::{AllocatorKind, ModelRepositoryConfig, Backend},
+    model_runtime::{LoadModelRequest, ModelRuntimeManager, SessionStarter},
 };
 
 // Current worker that I use is 16 vcpu: 12 is for compio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
 // TODO: make this configurable
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let num_cores = 10;
-    let num_executors = 8;
-    let batch_size = 64;
-    let capacity = 64;
 
     let cuda_provider = CUDAExecutionProvider::default()
         .with_device_id(0)
@@ -52,196 +46,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_global_thread_pool(thread_pool)
         .commit();
 
-    // Create all sessions and extract metadata from the first one
-    let mut sessions = Vec::with_capacity(num_executors);
-    let mut model_proxy: Option<Arc<scheduler::ModelProxy>> = None;
+    // Shared model map for gRPC handlers
+    let loaded_models: Arc<ArcSwap<HashMap<String, Arc<scheduler::ModelProxy>>>> =
+        Arc::new(ArcSwap::from_pointee(HashMap::new()));
 
-    for i in 0..num_executors {
-        let session = Session::builder()
-            .unwrap()
-            .with_optimization_level(GraphOptimizationLevel::Level3)
-            .unwrap()
-            .commit_from_file("samples/model.onnx")
-            .unwrap();
+    // Create the load-model channel
+    let (load_tx, load_rx) = tokio::sync::mpsc::channel::<LoadModelRequest>(16);
 
-        if i == 0 {
-            let metadata = session.metadata().unwrap();
-            let allocator = Allocator::new(
-                &session,
-                MemoryInfo::new(
-                    AllocationDevice::CUDA_PINNED,
-                    0,
-                    AllocatorType::Device,
-                    MemoryType::CPUInput,
-                )?,
-            )?;
-            let inputs = session.inputs().iter().collect();
-            let super_tensor_buffer =
-                SuperTensorBuffer::new(capacity, batch_size as usize, &inputs, &allocator).unwrap();
-
-            let inputs = session
-                .inputs()
-                .iter()
-                .map(|input| {
-                    let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
-                    let tensor_shape: Vec<i64> = input
-                        .dtype()
-                        .tensor_shape()
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                        .skip_while(|(i, dim)| *i == 0 && **dim == -1 && batch_size > 0)
-                        .map(|(_, dim)| dim)
-                        .cloned()
-                        .collect();
-                    ModelInput {
-                        name: input.name().to_string(),
-                        data_type: (*tensor_type).into(),
-                        format: 0,
-                        dims: tensor_shape,
-                        reshape: None,
-                        is_shape_tensor: false,
-                        allow_ragged_batch: false,
-                        optional: false,
-                        is_non_linear_format_io: false,
-                    }
-                })
-                .collect();
-
-            let outputs = session
-                .outputs()
-                .iter()
-                .map(|output| {
-                    let tensor_type: &DataType = &output.dtype().tensor_type().unwrap().into();
-                    let tensor_shape: Vec<i64> = output
-                        .dtype()
-                        .tensor_shape()
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                        .skip_while(|(i, dim)| *i == 0 && **dim == -1)
-                        .map(|(_, dim)| dim)
-                        .cloned()
-                        .collect();
-                    ModelOutput {
-                        name: output.name().to_string(),
-                        data_type: (*tensor_type).into(),
-                        dims: tensor_shape,
-                        reshape: None,
-                        is_shape_tensor: false,
-                        is_non_linear_format_io: false,
-                        label_filename: String::from(""),
-                    }
-                })
-                .collect();
-
-            let mut input_set = HashMap::new();
-            let inputs_metadata = session
-                .inputs()
-                .iter()
-                .map(|input| {
-                    let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
-                    let tensor_shape: Vec<i64> = input
-                        .dtype()
-                        .tensor_shape()
-                        .unwrap()
-                        .iter()
-                        .cloned()
-                        .collect();
-                    let mut input_shape = input.dtype().tensor_shape().unwrap().clone();
-                    input_shape[0] = 1;
-                    println!(
-                        "{:?} -> ({:?},{:?})",
-                        input.name(),
-                        tensor_type,
-                        tensor_shape
-                    );
-                    let input_metadata = ModelInputMetadata {
-                        shape: input_shape,
-                        order: i,
-                    };
-                    input_set.insert(input.name().to_string(), input_metadata);
-                    TensorMetadata {
-                        name: input.name().to_string(),
-                        datatype: tensor_type.to_metadata_string(),
-                        shape: tensor_shape,
-                    }
-                })
-                .collect();
-
-            let outputs_metadata = session
-                .outputs()
-                .iter()
-                .map(|output| {
-                    let tensor_type: &DataType = &output.dtype().tensor_type().unwrap().into();
-                    let tensor_shape: Vec<i64> = output
-                        .dtype()
-                        .tensor_shape()
-                        .unwrap()
-                        .iter()
-                        .cloned()
-                        .collect();
-                    TensorMetadata {
-                        name: output.name().to_string(),
-                        datatype: tensor_type.to_metadata_string(),
-                        shape: tensor_shape,
-                    }
-                })
-                .collect();
-
-            let model_metadata = ModelMetadata {
-                input_meta: inputs_metadata,
-                output_meta: outputs_metadata,
-                input_set,
-            };
-
-            let model_config = ModelConfig {
-                name: metadata.name().unwrap(),
-                platform: String::from("onnxruntime_onnx"),
-                backend: String::from("onnxruntime"),
-                runtime: String::from("onnxruntime"),
-                version_policy: None,
-                max_batch_size: batch_size,
-                input: inputs,
-                output: outputs,
-                batch_input: vec![],
-                batch_output: vec![],
-                optimization: None,
-                instance_group: vec![],
-                default_model_filename: String::from("todo"),
-                cc_model_filenames: HashMap::new(),
-                metric_tags: HashMap::new(),
-                parameters: HashMap::new(),
-                model_warmup: vec![],
-                model_operations: None,
-                model_transaction_policy: None,
-                model_repository_agents: None,
-                response_cache: None,
-                model_metrics: None,
-                scheduling_choice: None,
-            };
-
-            model_proxy = Some(Arc::from(scheduler::ModelProxy {
-                data: super_tensor_buffer,
-                model_config,
-                model_metadata,
-            }));
-        }
-
-        sessions.push(session);
-    }
-
-    let model_proxy = model_proxy.unwrap();
-
-    let mut model_map = HashMap::new();
-    model_map.insert(String::from("Int64ToFloat64Model"), model_proxy.clone());
-    let loaded_models = Arc::new(ArcSwap::from_pointee(model_map));
-
-    // Distribute executors to cores round-robin
-    let mut per_core_sessions: Vec<Vec<(usize, Session)>> =
-        (0..num_cores).map(|_| Vec::new()).collect();
-    for (i, session) in sessions.into_iter().enumerate() {
-        per_core_sessions[i % num_cores].push((i, session));
+    // Create per-core session starter channels
+    let mut starter_txs = Vec::with_capacity(num_cores);
+    let mut starter_rxs = Vec::with_capacity(num_cores);
+    for _ in 0..num_cores {
+        let (tx, rx) = tokio::sync::mpsc::channel(64);
+        starter_txs.push(tx);
+        starter_rxs.push(Some(rx));
     }
 
     let addr = "0.0.0.0:8001";
@@ -252,20 +70,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_concurrent_streams(100000)
         .max_frame_size(32 * 1024);
 
-    // Spawn one thread per core, each running executors + pajamax listener on the same compio runtime
-    let mut handles = Vec::new();
-
+    let grpc_loaded_models = loaded_models.clone();
     let services: Vec<Box<dyn Fn() -> std::rc::Rc<dyn pajamax::PajamaxService> + Send + Sync>> =
         vec![Box::new(move || {
             std::rc::Rc::new(GrpcInferenceServiceServer::new(TritonService::new(
-                loaded_models.clone(),
+                grpc_loaded_models.clone(),
             )))
         })];
     let grpc_server = Server::new(services, config, addr.to_string());
 
-    for (core_id, core_sessions) in per_core_sessions.into_iter().enumerate() {
-        let model_proxy = model_proxy.clone();
+    // Build the ModelRuntimeManager (will be moved into core-0)
+    let mut maybe_manager = Some(ModelRuntimeManager::new(load_rx, starter_txs, loaded_models));
+
+    let mut handles = Vec::new();
+
+    for core_id in 0..num_cores {
         let server = grpc_server.clone();
+        let starter_rx = starter_rxs[core_id].take().unwrap();
+        // Move manager into core-0's thread only
+        let manager_for_core = if core_id == 0 { maybe_manager.take() } else { None };
+
         let handle = std::thread::Builder::new()
             .name(format!("core-{core_id}"))
             .spawn(move || {
@@ -283,18 +107,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .expect("failed to build compio runtime");
 
                 rt.block_on(async move {
-                    // Spawn executors assigned to this core
-                    for (i, session) in core_sessions {
-                        let model_proxy = model_proxy.clone();
-                        compio::runtime::spawn(async move {
-                            let mut executor = loader::OnnxExecutor {
-                                id: format!("executor-{i}"),
-                                session,
-                                model: model_proxy,
-                            };
-                            executor.run().await;
-                        })
-                        .detach();
+                    // Spawn the session starter for this core
+                    compio::runtime::spawn(SessionStarter::new(starter_rx).run()).detach();
+
+                    // Core-0 also runs the model runtime manager
+                    if let Some(m) = manager_for_core {
+                        compio::runtime::spawn(m.run()).detach();
                     }
 
                     serve(server).await
@@ -303,7 +121,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .unwrap();
         handles.push(handle);
+
+        // Break out of the loop after moving manager so the compiler knows it's consumed once
+        if core_id == 0 {
+            continue;
+        }
     }
+
+    // Send initial model load request
+    let (reply_tx, _reply_rx) = tokio::sync::oneshot::channel();
+    load_tx.blocking_send(LoadModelRequest {
+        model_name: String::from("Int64ToFloat64Model"),
+        version: 1,
+        model_path: PathBuf::from("samples/model.onnx"),
+        config: ModelRepositoryConfig {
+            backend: Backend::Supertensor,
+            batch_size: 64,
+            capacity: 64,
+            num_executors: 8,
+            allocator: AllocatorKind::CudaPinned,
+        },
+        reply: reply_tx,
+    })?;
 
     for h in handles {
         h.join().expect("worker thread panicked");
