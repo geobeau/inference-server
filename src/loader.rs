@@ -16,7 +16,7 @@ pub struct OnnxExecutor {
 
 impl OnnxExecutor {
     pub async fn run(&mut self) {
-        println!("executor started");
+        println!("executor {} started", self.id);
 
         loop {
             // println!("trying to execute another batch");

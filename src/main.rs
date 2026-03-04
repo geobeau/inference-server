@@ -1,5 +1,6 @@
 mod grpc;
 mod loader;
+mod metrics;
 mod model_repository;
 mod model_runtime;
 mod scheduler;
@@ -46,6 +47,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_global_thread_pool(thread_pool)
         .commit();
 
+    // Metrics registry
+    let metrics_registry = Arc::new(metrics::MetricsRegistry::new());
+
     // Shared model map for gRPC handlers
     let loaded_models: Arc<ArcSwap<HashMap<String, Arc<scheduler::ModelProxy>>>> =
         Arc::new(ArcSwap::from_pointee(HashMap::new()));
@@ -71,16 +75,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_frame_size(32 * 1024);
 
     let grpc_loaded_models = loaded_models.clone();
+    let grpc_metrics = metrics_registry.clone();
     let services: Vec<Box<dyn Fn() -> std::rc::Rc<dyn pajamax::PajamaxService> + Send + Sync>> =
         vec![Box::new(move || {
             std::rc::Rc::new(GrpcInferenceServiceServer::new(TritonService::new(
                 grpc_loaded_models.clone(),
+                grpc_metrics.clone(),
             )))
         })];
     let grpc_server = Server::new(services, config, addr.to_string());
 
     // Build the ModelRuntimeManager (will be moved into core-0)
-    let mut maybe_manager = Some(ModelRuntimeManager::new(load_rx, starter_txs, loaded_models));
+    let mut maybe_manager = Some(ModelRuntimeManager::new(
+        load_rx,
+        starter_txs,
+        loaded_models,
+        metrics_registry.clone(),
+    ));
 
     let mut handles = Vec::new();
 
@@ -89,6 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let starter_rx = starter_rxs[core_id].take().unwrap();
         // Move manager into core-0's thread only
         let manager_for_core = if core_id == 0 { maybe_manager.take() } else { None };
+        let metrics_for_core = if core_id == 0 { Some(metrics_registry.clone()) } else { None };
 
         let handle = std::thread::Builder::new()
             .name(format!("core-{core_id}"))
@@ -110,9 +122,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Spawn the session starter for this core
                     compio::runtime::spawn(SessionStarter::new(starter_rx).run()).detach();
 
-                    // Core-0 also runs the model runtime manager
+                    // Core-0 also runs the model runtime manager and metrics server
                     if let Some(m) = manager_for_core {
                         compio::runtime::spawn(m.run()).detach();
+                    }
+                    if let Some(mr) = metrics_for_core {
+                        compio::runtime::spawn(metrics::serve_metrics("0.0.0.0:9090", mr)).detach();
                     }
 
                     serve(server).await

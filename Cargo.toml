@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.47.0", features = ["full"] }
-compio = { version = "0.18", features = ["runtime", "time"] }
+compio = { version = "0.18", features = ["runtime", "time", "net", "io"] }
 criterion = "0.5.1"
 ort = { git = "https://github.com/pykeio/ort", rev = "b57e457d5b0f56aad6a093c081aee49c179c3fcb", features = [ "cuda", "load-dynamic"] }
 ort-sys = { git = "https://github.com/pykeio/ort", rev = "b57e457d5b0f56aad6a093c081aee49c179c3fcb", default-features = false }
@@ -29,6 +29,7 @@ arc-swap = "1.7.1"
 bytemuck = "1.24.0"
 log = "0.4.28"
 smallvec = "1.15.1"
+prometheus-client = "0.24"
 
 [profile.dev]
 opt-level = 2

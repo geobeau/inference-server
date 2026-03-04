@@ -13,6 +13,7 @@ use tokio::sync::oneshot;
 use crate::grpc::inference::{
     model_metadata_response::TensorMetadata, DataType, ModelConfig, ModelInput, ModelOutput,
 };
+use crate::metrics::MetricsRegistry;
 use crate::model_repository::config::{AllocatorKind, ModelRepositoryConfig};
 use crate::scheduler::{ModelInputMetadata, ModelMetadata, ModelProxy};
 use crate::tensor::supertensor::SuperTensorBuffer;
@@ -39,6 +40,7 @@ pub struct ModelRuntimeManager {
     receiver: mpsc::Receiver<LoadModelRequest>,
     starters: Vec<mpsc::Sender<SessionStartRequest>>,
     loaded_models: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
+    metrics: Arc<MetricsRegistry>,
     round_robin: AtomicUsize,
 }
 
@@ -47,11 +49,13 @@ impl ModelRuntimeManager {
         receiver: mpsc::Receiver<LoadModelRequest>,
         starters: Vec<mpsc::Sender<SessionStartRequest>>,
         loaded_models: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
+        metrics: Arc<MetricsRegistry>,
     ) -> Self {
         Self {
             receiver,
             starters,
             loaded_models,
+            metrics,
             round_robin: AtomicUsize::new(0),
         }
     }
@@ -69,6 +73,7 @@ impl ModelRuntimeManager {
         model_path: PathBuf,
         config: &ModelRepositoryConfig,
     ) -> Result<(), LoadError> {
+        println!("Loading model {model_name} at {model_path:?}");
         let num_executors = config.num_executors;
         let batch_size = config.batch_size;
         let capacity = config.capacity;
@@ -263,6 +268,7 @@ impl ModelRuntimeManager {
         let mut new_map = (**current).clone();
         new_map.insert(model_name, model_proxy.clone());
         self.loaded_models.store(Arc::new(new_map));
+        self.metrics.loaded_models.inc();
 
         // Dispatch sessions round-robin to session starters
         for (i, session) in sessions.into_iter().enumerate() {

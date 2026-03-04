@@ -13,20 +13,25 @@ use pajamax::status::{Code, Status};
 use smallvec::SmallVec;
 
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
+use crate::metrics::MetricsRegistry;
 use crate::scheduler::ModelProxy;
 use crate::tensor::batched_tensor::TensorBytes;
 use crate::tracing::ClientTrace;
 
 #[derive(Clone)]
 pub struct TritonService {
-    /// Set of model names that are currently considered "loaded"
     pub loaded_models: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
+    pub metrics: Arc<MetricsRegistry>,
 }
 
 impl TritonService {
-    pub fn new(model_map: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>) -> Self {
+    pub fn new(
+        model_map: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
+        metrics: Arc<MetricsRegistry>,
+    ) -> Self {
         TritonService {
             loaded_models: model_map,
+            metrics,
         }
     }
 }
@@ -91,16 +96,25 @@ impl GrpcInferenceService for TritonService {
 
     async fn model_infer(&self, request: ModelInferRequest) -> Result<ModelInferResponse, Status> {
         let mut trace = ClientTrace::start();
+        let start = std::time::Instant::now();
+        let model_name = request.model_name.clone();
 
         let models = self.loaded_models.load();
 
-        let proxy: &ModelProxy = match models.get(&request.model_name) {
+        let proxy: &ModelProxy = match models.get(&model_name) {
             Some(proxy) => proxy,
             None => {
+                self.metrics
+                    .inference_requests_total
+                    .get_or_create(&vec![
+                        ("model".to_string(), model_name.clone()),
+                        ("status".to_string(), "not_found".to_string()),
+                    ])
+                    .inc();
                 return Err(Status {
                     code: Code::NotFound,
-                    message: format!("Model {} not found", &request.model_name),
-                })
+                    message: format!("Model {} not found", &model_name),
+                });
             }
         };
         trace.record_model_proxy_aquired();
@@ -148,6 +162,19 @@ impl GrpcInferenceService for TritonService {
             })
             .collect();
         trace.record_output_processed();
+
+        let labels = vec![
+            ("model".to_string(), model_name.clone()),
+            ("status".to_string(), "ok".to_string()),
+        ];
+        self.metrics
+            .inference_requests_total
+            .get_or_create(&labels)
+            .inc();
+        self.metrics
+            .inference_request_duration_seconds
+            .get_or_create(&vec![("model".to_string(), model_name)])
+            .observe(start.elapsed().as_secs_f64());
 
         Ok(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),
