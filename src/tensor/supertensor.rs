@@ -91,7 +91,9 @@ impl WriteReservation<'_> {
     fn new(tracker: &DataTracker, start: usize, end: usize) -> WriteReservation<'_> {
         let response_ready_notified = tracker.response_ready_notifier.notified();
         let output_arc = tracker.output.load_full().clone();
-        tracker.written_slots.fetch_add(end - start, Ordering::Release);
+        tracker
+            .written_slots
+            .fetch_add(end - start, Ordering::Release);
         WriteReservation {
             tracker,
             start,
@@ -124,10 +126,7 @@ impl WriteReservation<'_> {
                             self.start,
                             self.end,
                         ));
-                        metadatas.push((
-                            *batch_tensor.data_type(),
-                            batch_tensor.shape().clone(),
-                        ));
+                        metadatas.push((*batch_tensor.data_type(), batch_tensor.shape().clone()));
                     });
             }
             Err(_) => todo!(),
@@ -259,31 +258,28 @@ impl SuperTensorBuffer {
             if !is_power_of_two(capacity) {
                 panic!("Buffer is not power of 2: {capacity}")
             }
-            let mut input_tensors = Vec::new();
+            let mut input_tensors = Vec::with_capacity(capacity);
 
-            inputs.iter().for_each(|input| {
-                let (ty, shape) = match &input.dtype() {
-                    ort::value::ValueType::Tensor {
-                        ty,
-                        shape,
-                        dimension_symbols: _,
-                    } => (ty, shape),
-                    ort::value::ValueType::Sequence(_value_type) => todo!(),
-                    ort::value::ValueType::Map { key: _, value: _ } => todo!(),
-                    ort::value::ValueType::Optional(_value_type) => todo!(),
-                };
-                let mut batched_tensors = SmallVec::with_capacity(capacity);
-                for _ in 0..capacity {
-                    batched_tensors.push(UnsafeCell::from(BatchableTensor::new(
-                        *ty,
-                        shape,
-                        batch_size,
-                        allocator,
+            for _ in 0..capacity {
+                let mut batched_input_tensors = SmallVec::with_capacity(capacity);
+                inputs.iter().for_each(|input| {
+                    let (ty, shape) = match &input.dtype() {
+                        ort::value::ValueType::Tensor {
+                            ty,
+                            shape,
+                            dimension_symbols: _,
+                        } => (ty, shape),
+                        ort::value::ValueType::Sequence(_value_type) => todo!(),
+                        ort::value::ValueType::Map { key: _, value: _ } => todo!(),
+                        ort::value::ValueType::Optional(_value_type) => todo!(),
+                    };
+
+                    batched_input_tensors.push(UnsafeCell::from(BatchableTensor::new(
+                        *ty, shape, batch_size, allocator,
                     )));
-                }
-
-                input_tensors.push(batched_tensors);
-            });
+                });
+                input_tensors.push(batched_input_tensors);
+            }
 
             let mut trackers = Vec::with_capacity(capacity);
             for _i in 0..capacity {
@@ -361,11 +357,12 @@ impl SuperTensorBuffer {
                     let batch_id = current_head.as_absolute_index();
 
                     loop {
-                        let capacity_in_current_batch = current_head.as_absolute_batch_higher_bound()
+                        let capacity_in_current_batch = current_head
+                            .as_absolute_batch_higher_bound()
                             .wrapping_sub(current_head.as_absolute_index());
 
                         let to_write = min(client_batch_size, capacity_in_current_batch);
-                
+
                         let input_end = input_start + to_write;
 
                         trace.record_inference_in_queue();
@@ -375,8 +372,12 @@ impl SuperTensorBuffer {
                         //     current_head.as_absolute_index(),
                         //     current_head.as_absolute_batch_higher_bound(),
                         // );
-                        let write_reservation =
-                            self.insert_tensors_at(current_head.clone(), input_start, input_end, data);
+                        let write_reservation = self.insert_tensors_at(
+                            current_head.clone(),
+                            input_start,
+                            input_end,
+                            data,
+                        );
                         response.push(write_reservation);
                         input_start = input_end;
                         client_batch_size -= to_write;
@@ -416,14 +417,15 @@ impl SuperTensorBuffer {
         //     idx.as_batch_slot_id()
         // );
         let batch_slot = idx.as_batch_slot_id();
-        self.input_tensors
+        let batch_id = idx.as_batch_id();
+        self.input_tensors[batch_id]
             .iter()
             .enumerate()
             .for_each(|(i, tensors)| {
                 unsafe {
                     // Isolation of portions of the vector is guaranteed by reserved_slots atomics
                     let slice = data[i].slice_dim0(data_start, data_end);
-                    let batch_tensor = (&mut *tensors[batch_slot].get());
+                    let batch_tensor = (&mut *tensors.get());
                     // println!("Slicing of len {} -> {} between {data_start} and {data_end}", slice.len(), batch_tensor.inner_tensor.shape().num_elements() );
                     batch_tensor.copy_at_from_bytes(batch_slot, slice)
                 }
@@ -554,18 +556,18 @@ impl SuperTensorBuffer {
                 && dirty_state
                     .compare_exchange_weak(dirty, 0, Ordering::AcqRel, Ordering::Acquire)
                     .is_ok()
-                    && self
-                        .tail
-                        .compare_exchange_weak(
-                            tail.as_absolute_index(),
-                            tail.as_absolute_batch_higher_bound(),
-                        )
-                        .is_ok()
-                    {
-                        self.executor_full_notifier.notify_waiters();
-                        self.infer_full_notifier.notify_waiters();
-                        continue;
-                    }
+                && self
+                    .tail
+                    .compare_exchange_weak(
+                        tail.as_absolute_index(),
+                        tail.as_absolute_batch_higher_bound(),
+                    )
+                    .is_ok()
+            {
+                self.executor_full_notifier.notify_waiters();
+                self.infer_full_notifier.notify_waiters();
+                continue;
+            }
             break;
         }
     }
@@ -577,8 +579,8 @@ impl SuperTensorBuffer {
             let mut all_inputs = SmallVec::new();
             let batch_id = current_executor_idx.as_batch_id();
 
-            self.input_tensors.iter().for_each(|batch_tensors| {
-                all_inputs.push((*batch_tensors[batch_id].get()).inner_tensor.view().into());
+            self.input_tensors[batch_id].iter().for_each(|batch_tensors| {
+                all_inputs.push((*batch_tensors.get()).inner_tensor.view().into());
             });
             all_inputs
         }
