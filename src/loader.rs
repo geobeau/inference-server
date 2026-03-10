@@ -3,6 +3,8 @@ use std::sync::Arc;
 use ort::session::{RunOptions, Session};
 use smallvec::SmallVec;
 
+use tracing::info;
+
 use crate::{scheduler::ModelProxy, tensor::supertensor::SessionValues};
 
 pub struct OnnxExecutor {
@@ -13,7 +15,7 @@ pub struct OnnxExecutor {
 
 impl OnnxExecutor {
     pub async fn run(&mut self) {
-        println!("executor {} started", self.id);
+        info!(id = %self.id, "executor started");
 
         loop {
             // println!("trying to execute another batch");

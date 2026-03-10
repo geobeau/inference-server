@@ -3,10 +3,11 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
+use tracing::debug;
+
 use crate::metrics::LocalMetrics;
 
-pub struct ClientTrace<'a> {
-    local_metrics: &'a LocalMetrics,
+pub struct ClientTrace {
     pub start: Instant,
     model_proxy_aquired: Option<Duration>,
     serialization_done: Option<Duration>,
@@ -14,12 +15,10 @@ pub struct ClientTrace<'a> {
     output_processed: Option<Duration>,
 }
 
-impl<'a> ClientTrace<'a> {
-    pub fn start(local_metrics: &'a LocalMetrics) -> ClientTrace<'a> {
-        let start: Instant = Instant::now();
+impl ClientTrace {
+    pub fn start() -> ClientTrace {
         ClientTrace {
-            local_metrics,
-            start,
+            start: Instant::now(),
             model_proxy_aquired: None,
             serialization_done: None,
             inference_in_queue: None,
@@ -40,24 +39,25 @@ impl<'a> ClientTrace<'a> {
         self.output_processed = Some(self.start.elapsed())
     }
 
-    pub fn record_metrics(&self, model_name: &str) {
-        self.local_metrics
+    pub fn record_metrics(&self, model_name: &str, local_metrics: &LocalMetrics) {
+        local_metrics
             .observe_model_proxy_aquired(model_name, self.model_proxy_aquired.unwrap().as_secs_f64());
-        self.local_metrics
+        local_metrics
             .observe_serialization_done(model_name, self.serialization_done.unwrap().as_secs_f64());
-        self.local_metrics
+        local_metrics
             .observe_inference_in_queue(model_name, self.inference_in_queue.unwrap().as_secs_f64());
-        self.local_metrics
+        local_metrics
             .observe_output_processed(model_name, self.output_processed.unwrap().as_secs_f64());
     }
 
     pub fn print_debug(&self) {
-        println!("---\ntime to aquire model config {:?}\n deserialize the proto {:?}\n inference in queue {:?}\n output is processed {:?}", 
-            self.model_proxy_aquired,
-            self.serialization_done.unwrap() - self.model_proxy_aquired.unwrap(),
-            self.inference_in_queue.unwrap() - self.serialization_done.unwrap(),
-            self.output_processed.unwrap() - self.inference_in_queue.unwrap(),
-        )
+        debug!(
+            model_proxy_aquired = ?self.model_proxy_aquired,
+            deserialization = ?self.serialization_done.unwrap() - self.model_proxy_aquired.unwrap(),
+            inference_in_queue = ?self.inference_in_queue.unwrap() - self.serialization_done.unwrap(),
+            output_processed = ?self.output_processed.unwrap() - self.inference_in_queue.unwrap(),
+            "client trace",
+        );
     }
 }
 
@@ -71,11 +71,12 @@ pub struct BatchTrace {
 
 impl BatchTrace {
     fn print_debug(&self) {
-        println!("---\ntime to complete batch {:?}\n picked by executor {:?}\n inference duration {:?}\n time to gather output {:?}", 
-            self.batch_complete.borrow(),
-            *self.batch_inference_start.borrow() - *self.batch_complete.borrow(),
-            *self.batch_inference_done.borrow() - *self.batch_inference_start.borrow(),
-            *self.batch_released.borrow() - *self.batch_inference_done.borrow(),
-        )
+        debug!(
+            batch_complete = ?self.batch_complete.borrow(),
+            picked_by_executor = ?*self.batch_inference_start.borrow() - *self.batch_complete.borrow(),
+            inference_duration = ?*self.batch_inference_done.borrow() - *self.batch_inference_start.borrow(),
+            gather_output = ?*self.batch_released.borrow() - *self.batch_inference_done.borrow(),
+            "batch trace",
+        );
     }
 }

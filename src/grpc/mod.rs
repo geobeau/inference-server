@@ -11,6 +11,7 @@ use inference::*;
 use ort::value::Shape;
 use pajamax::status::{Code, Status};
 use smallvec::SmallVec;
+use tracing::{debug, info};
 
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
 use crate::metrics::{LocalMetrics, MetricsRegistry};
@@ -40,17 +41,17 @@ unsafe impl Send for ModelInferResponse {}
 #[async_trait::async_trait(?Send)]
 impl GrpcInferenceService for TritonService {
     async fn server_live(&self, _req: ServerLiveRequest) -> Result<ServerLiveResponse, Status> {
-        println!("is live?");
+        debug!("is live?");
         Ok(ServerLiveResponse { live: true })
     }
 
     async fn server_ready(&self, _req: ServerReadyRequest) -> Result<ServerReadyResponse, Status> {
-        println!("is server ready?");
+        debug!("is server ready?");
         Ok(ServerReadyResponse { ready: true })
     }
 
     async fn model_ready(&self, request: ModelReadyRequest) -> Result<ModelReadyResponse, Status> {
-        println!("is model ready?");
+        debug!("is model ready?");
         let _ = request.name.clone();
         let is_ready = false;
         Ok(ModelReadyResponse { ready: is_ready })
@@ -60,7 +61,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _req: ServerMetadataRequest,
     ) -> Result<ServerMetadataResponse, Status> {
-        println!("server metadata");
+        debug!("server metadata");
         let reply = ServerMetadataResponse {
             name: "inference-server".to_string(),
             version: "1.0.0-demo".to_string(),
@@ -74,10 +75,10 @@ impl GrpcInferenceService for TritonService {
         request: ModelMetadataRequest,
     ) -> Result<ModelMetadataResponse, Status> {
         let model_name = &request.name;
-        println!("Getting model config for {model_name}");
+        info!(model_name, "Getting model metadata");
         match self.loaded_models.load().get(model_name) {
             Some(proxy) => {
-                println!("Got model, responding");
+                debug!(model_name, "Got model, responding");
                 Ok(ModelMetadataResponse {
                     name: model_name.clone(),
                     versions: vec![String::from("1")],
@@ -94,7 +95,7 @@ impl GrpcInferenceService for TritonService {
     }
 
     async fn model_infer(&self, request: ModelInferRequest) -> Result<ModelInferResponse, Status> {
-        let mut trace = ClientTrace::start(&self.local_metrics);
+        let mut trace = ClientTrace::start();
         let start = std::time::Instant::now();
         let model_name = request.model_name.clone();
         let models = self.loaded_models.load();
@@ -159,7 +160,7 @@ impl GrpcInferenceService for TritonService {
         self.local_metrics
             .observe_request_duration(&model_name, start.elapsed().as_secs_f64());
 
-        trace.record_metrics(model_name.as_str());
+        trace.record_metrics(model_name.as_str(), &self.local_metrics);
 
         Ok(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),
@@ -176,7 +177,7 @@ impl GrpcInferenceService for TritonService {
         request: ModelConfigRequest,
     ) -> Result<ModelConfigResponse, Status> {
         let model_name = &request.name;
-        println!("Getting model config for {model_name}");
+        info!(model_name, "Getting model config");
         match self.loaded_models.load().get(model_name) {
             Some(proxy) => Ok(ModelConfigResponse {
                 config: Some(proxy.model_config.clone()),
@@ -192,7 +193,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _request: ModelStatisticsRequest,
     ) -> Result<ModelStatisticsResponse, Status> {
-        println!("stat");
+        debug!("model statistics");
         todo!()
     }
 
@@ -200,7 +201,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _request: RepositoryIndexRequest,
     ) -> Result<RepositoryIndexResponse, Status> {
-        println!("index");
+        debug!("repository index");
         Ok(RepositoryIndexResponse { models: vec![] })
     }
 
@@ -208,7 +209,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _request: RepositoryModelLoadRequest,
     ) -> Result<RepositoryModelLoadResponse, Status> {
-        println!("load");
+        debug!("repository model load");
         Ok(RepositoryModelLoadResponse {})
     }
 
@@ -216,7 +217,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _request: RepositoryModelUnloadRequest,
     ) -> Result<RepositoryModelUnloadResponse, Status> {
-        println!("unload");
+        debug!("repository model unload");
         Ok(RepositoryModelUnloadResponse {})
     }
 
@@ -224,7 +225,7 @@ impl GrpcInferenceService for TritonService {
         &self,
         _request: SystemSharedMemoryStatusRequest,
     ) -> Result<SystemSharedMemoryStatusResponse, Status> {
-        println!("status");
+        debug!("system shared memory status");
         todo!()
     }
 

@@ -7,8 +7,9 @@ mod scheduler;
 mod tensor;
 mod tracing;
 use arc_swap::ArcSwap;
-use log::info;
 use pajamax::{serve, Server};
+use ::tracing::info;
+use tracing_subscriber::EnvFilter;
 use std::path::PathBuf;
 use std::{collections::HashMap, sync::Arc};
 
@@ -23,6 +24,15 @@ use crate::{
 // Current worker that I use is 16 vcpu: 12 is for compio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
 // TODO: make this configurable
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .with_file(true)
+        .with_line_number(true)
+        .with_target(true)
+        .init();
+
     let num_cores = 16;
 
     let cuda_provider = CUDAExecutionProvider::default()

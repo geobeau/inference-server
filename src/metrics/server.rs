@@ -4,6 +4,8 @@ use compio::buf::BufResult;
 use compio::io::{AsyncRead, AsyncWriteExt};
 use compio::net::{TcpListener, TcpStream};
 
+use tracing::info;
+
 use super::registry::MetricsRegistry;
 
 async fn handle_connection(mut stream: TcpStream, registry: Arc<MetricsRegistry>) {
@@ -25,7 +27,7 @@ async fn handle_connection(mut stream: TcpStream, registry: Arc<MetricsRegistry>
 
 pub async fn serve_metrics(addr: &str, registry: Arc<MetricsRegistry>) {
     let listener = TcpListener::bind(addr).await.unwrap();
-    println!("Metrics server listening on {}", addr);
+    info!(addr, "Metrics server listening");
 
     loop {
         let (stream, _peer_addr) = listener.accept().await.unwrap();

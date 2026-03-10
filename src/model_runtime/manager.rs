@@ -18,6 +18,8 @@ use crate::model_repository::config::{AllocatorKind, ModelRepositoryConfig};
 use crate::scheduler::{ModelInputMetadata, ModelMetadata, ModelProxy};
 use crate::tensor::supertensor::SuperTensorBuffer;
 
+use tracing::info;
+
 use super::session_starter::SessionStartRequest;
 
 pub struct LoadModelRequest {
@@ -75,7 +77,7 @@ impl ModelRuntimeManager {
         model_path: PathBuf,
         config: &ModelRepositoryConfig,
     ) -> Result<(), LoadError> {
-        println!("Loading model {model_name} at {model_path:?}");
+        info!(%model_name, ?model_path, "Loading model");
         let num_executors = config.num_executors;
         let batch_size = config.batch_size;
         let capacity = config.capacity;

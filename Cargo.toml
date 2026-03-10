@@ -27,7 +27,8 @@ local-sync = "0.1"
 num-traits = "0.2.19"
 arc-swap = "1.7.1"
 bytemuck = "1.24.0"
-log = "0.4.28"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 smallvec = "1.15.1"
 prometheus = "0.13"
 
