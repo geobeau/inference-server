@@ -14,24 +14,21 @@ use smallvec::SmallVec;
 use tracing::{debug, info};
 
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
-use crate::metrics::{LocalMetrics, MetricsRegistry};
+use crate::metrics::with_local_metrics;
 use crate::scheduler::ModelProxy;
 use crate::tensor::batched_tensor::TensorBytes;
 use crate::tracing::ClientTrace;
 
 pub struct TritonService {
     pub loaded_models: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
-    pub local_metrics: LocalMetrics,
 }
 
 impl TritonService {
     pub fn new(
         model_map: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
-        metrics: Arc<MetricsRegistry>,
     ) -> Self {
         TritonService {
             loaded_models: model_map,
-            local_metrics: LocalMetrics::new(metrics),
         }
     }
 }
@@ -103,7 +100,7 @@ impl GrpcInferenceService for TritonService {
         let proxy: &ModelProxy = match models.get(&model_name) {
             Some(proxy) => proxy,
             None => {
-                self.local_metrics.inc_requests_not_found(&model_name);
+                with_local_metrics(|m| m.inc_requests_not_found(&model_name));
                 return Err(Status {
                     code: Code::NotFound,
                     message: format!("Model {} not found", &model_name),
@@ -156,11 +153,11 @@ impl GrpcInferenceService for TritonService {
             .collect();
         trace.record_output_processed();
 
-        self.local_metrics.inc_requests_ok(&model_name);
-        self.local_metrics
-            .observe_request_duration(&model_name, start.elapsed().as_secs_f64());
-
-        trace.record_metrics(model_name.as_str(), &self.local_metrics);
+        with_local_metrics(|m| {
+            m.inc_requests_ok(&model_name);
+            m.observe_request_duration(&model_name, start.elapsed().as_secs_f64());
+            trace.record_metrics(model_name.as_str(), m);
+        });
 
         Ok(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),

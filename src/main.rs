@@ -79,12 +79,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_frame_size(32 * 1024);
 
     let grpc_loaded_models = loaded_models.clone();
-    let grpc_metrics = metrics_registry.clone();
     let services: Vec<Box<dyn Fn() -> std::rc::Rc<dyn pajamax::PajamaxService> + Send + Sync>> =
         vec![Box::new(move || {
             std::rc::Rc::new(GrpcInferenceServiceServer::new(TritonService::new(
                 grpc_loaded_models.clone(),
-                grpc_metrics.clone(),
             )))
         })];
     let grpc_server = Server::new(services, config, addr.to_string());
@@ -102,6 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for core_id in 0..num_cores {
         let server = grpc_server.clone();
         let starter_rx = starter_rxs[core_id].take().unwrap();
+        let metrics_for_worker = metrics_registry.clone();
         // Move manager into core-0's thread only
         let manager_for_core = if core_id == 0 {
             maybe_manager.take()
@@ -131,6 +130,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .expect("failed to build compio runtime");
 
                 rt.block_on(async move {
+                    // Initialize thread-local metrics and spawn periodic flush
+                    metrics::init_local_metrics(metrics_for_worker);
+                    compio::runtime::spawn(async {
+                        loop {
+                            compio::time::sleep(std::time::Duration::from_secs(1)).await;
+                            metrics::flush_local_metrics();
+                        }
+                    })
+                    .detach();
+
                     // Spawn the session starter for this core
                     compio::runtime::spawn(SessionStarter::new(starter_rx).run()).detach();
 

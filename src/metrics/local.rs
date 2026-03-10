@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -6,7 +6,33 @@ use prometheus::local::{LocalHistogram, LocalIntCounter};
 
 use super::MetricsRegistry;
 
-const FLUSH_INTERVAL: u64 = 256;
+thread_local! {
+    static LOCAL_METRICS: RefCell<Option<LocalMetrics>> = const { RefCell::new(None) };
+}
+
+pub fn init_local_metrics(registry: Arc<MetricsRegistry>) {
+    LOCAL_METRICS.with(|m| {
+        *m.borrow_mut() = Some(LocalMetrics::new(registry));
+    });
+}
+
+pub fn with_local_metrics<F, R>(f: F) -> R
+where
+    F: FnOnce(&LocalMetrics) -> R,
+{
+    LOCAL_METRICS.with(|m| {
+        let borrow = m.borrow();
+        f(borrow.as_ref().expect("LocalMetrics not initialized"))
+    })
+}
+
+pub fn flush_local_metrics() {
+    LOCAL_METRICS.with(|m| {
+        if let Some(metrics) = m.borrow().as_ref() {
+            metrics.flush();
+        }
+    });
+}
 
 struct LocalModelMetrics {
     requests_ok: LocalIntCounter,
@@ -21,23 +47,13 @@ struct LocalModelMetrics {
 pub struct LocalMetrics {
     registry: Arc<MetricsRegistry>,
     per_model: RefCell<HashMap<String, LocalModelMetrics>>,
-    ops: Cell<u64>,
 }
 
 impl LocalMetrics {
-    pub fn new(registry: Arc<MetricsRegistry>) -> Self {
+    fn new(registry: Arc<MetricsRegistry>) -> Self {
         Self {
             registry,
             per_model: RefCell::new(HashMap::new()),
-            ops: Cell::new(0),
-        }
-    }
-
-    fn maybe_flush(&self) {
-        let count = self.ops.get() + 1;
-        self.ops.set(count);
-        if count % FLUSH_INTERVAL == 0 {
-            self.flush();
         }
     }
 
@@ -84,13 +100,11 @@ impl LocalMetrics {
     pub fn inc_requests_ok(&self, model: &str) {
         self.ensure_model(model);
         self.per_model.borrow()[model].requests_ok.inc();
-        self.maybe_flush();
     }
 
     pub fn inc_requests_not_found(&self, model: &str) {
         self.ensure_model(model);
         self.per_model.borrow()[model].requests_not_found.inc();
-        self.maybe_flush();
     }
 
     pub fn observe_request_duration(&self, model: &str, duration: f64) {
