@@ -62,7 +62,9 @@ impl ModelRuntimeManager {
 
     pub async fn run(mut self) {
         while let Some(req) = self.receiver.recv().await {
-            let result = self.load_model(req.model_name, req.model_path, &req.config).await;
+            let result = self
+                .load_model(req.model_name, req.model_path, &req.config)
+                .await;
             let _ = req.reply.send(result);
         }
     }

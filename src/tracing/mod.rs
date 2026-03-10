@@ -1,9 +1,12 @@
-use std::{cell::RefCell, time::Duration};
+use std::cell::RefCell;
+use std::time::Duration;
 
 use tokio::time::Instant;
 
-#[derive(Debug)]
-pub struct ClientTrace {
+use crate::metrics::LocalMetrics;
+
+pub struct ClientTrace<'a> {
+    local_metrics: &'a LocalMetrics,
     pub start: Instant,
     model_proxy_aquired: Option<Duration>,
     serialization_done: Option<Duration>,
@@ -11,10 +14,11 @@ pub struct ClientTrace {
     output_processed: Option<Duration>,
 }
 
-impl ClientTrace {
-    pub fn start() -> ClientTrace {
+impl<'a> ClientTrace<'a> {
+    pub fn start(local_metrics: &'a LocalMetrics) -> ClientTrace<'a> {
         let start: Instant = Instant::now();
         ClientTrace {
+            local_metrics,
             start,
             model_proxy_aquired: None,
             serialization_done: None,
@@ -35,9 +39,18 @@ impl ClientTrace {
     pub fn record_output_processed(&mut self) {
         self.output_processed = Some(self.start.elapsed())
     }
-}
 
-impl ClientTrace {
+    pub fn record_metrics(&self, model_name: &str) {
+        self.local_metrics
+            .observe_model_proxy_aquired(model_name, self.model_proxy_aquired.unwrap().as_secs_f64());
+        self.local_metrics
+            .observe_serialization_done(model_name, self.serialization_done.unwrap().as_secs_f64());
+        self.local_metrics
+            .observe_inference_in_queue(model_name, self.inference_in_queue.unwrap().as_secs_f64());
+        self.local_metrics
+            .observe_output_processed(model_name, self.output_processed.unwrap().as_secs_f64());
+    }
+
     pub fn print_debug(&self) {
         println!("---\ntime to aquire model config {:?}\n deserialize the proto {:?}\n inference in queue {:?}\n output is processed {:?}", 
             self.model_proxy_aquired,

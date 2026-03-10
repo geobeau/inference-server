@@ -12,24 +12,18 @@ use pajamax::{serve, Server};
 use std::path::PathBuf;
 use std::{collections::HashMap, sync::Arc};
 
-use ort::{
-    environment::GlobalThreadPoolOptions,
-    execution_providers::CUDAExecutionProvider,
-};
+use ort::{environment::GlobalThreadPoolOptions, execution_providers::CUDAExecutionProvider};
 
 use crate::{
-    grpc::{
-        inference::GrpcInferenceServiceServer,
-        TritonService,
-    },
-    model_repository::config::{AllocatorKind, ModelRepositoryConfig, Backend},
+    grpc::{inference::GrpcInferenceServiceServer, TritonService},
+    model_repository::config::{AllocatorKind, Backend, ModelRepositoryConfig},
     model_runtime::{LoadModelRequest, ModelRuntimeManager, SessionStarter},
 };
 
 // Current worker that I use is 16 vcpu: 12 is for compio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
 // TODO: make this configurable
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let num_cores = 10;
+    let num_cores = 16;
 
     let cuda_provider = CUDAExecutionProvider::default()
         .with_device_id(0)
@@ -99,8 +93,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let server = grpc_server.clone();
         let starter_rx = starter_rxs[core_id].take().unwrap();
         // Move manager into core-0's thread only
-        let manager_for_core = if core_id == 0 { maybe_manager.take() } else { None };
-        let metrics_for_core = if core_id == 0 { Some(metrics_registry.clone()) } else { None };
+        let manager_for_core = if core_id == 0 {
+            maybe_manager.take()
+        } else {
+            None
+        };
+        let metrics_for_core = if core_id == 0 {
+            Some(metrics_registry.clone())
+        } else {
+            None
+        };
 
         let handle = std::thread::Builder::new()
             .name(format!("core-{core_id}"))
@@ -151,9 +153,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         model_path: PathBuf::from("samples/model.onnx"),
         config: ModelRepositoryConfig {
             backend: Backend::Supertensor,
-            batch_size: 64,
-            capacity: 64,
-            num_executors: 8,
+            batch_size: 256,
+            capacity: 32,
+            num_executors: 10,
             allocator: AllocatorKind::CudaPinned,
         },
         reply: reply_tx,

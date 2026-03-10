@@ -329,7 +329,7 @@ impl SuperTensorBuffer {
     pub async fn infer(
         &self,
         data: &[TensorBytes<'_>],
-        trace: &mut ClientTrace,
+        trace: &mut ClientTrace<'_>,
     ) -> Result<InferenceResponse<'_>, usize> {
         loop {
             let mut current_head = self.head.load(Ordering::Relaxed);

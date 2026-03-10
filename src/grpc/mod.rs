@@ -13,15 +13,14 @@ use pajamax::status::{Code, Status};
 use smallvec::SmallVec;
 
 use crate::grpc::inference::model_infer_response::InferOutputTensor;
-use crate::metrics::MetricsRegistry;
+use crate::metrics::{LocalMetrics, MetricsRegistry};
 use crate::scheduler::ModelProxy;
 use crate::tensor::batched_tensor::TensorBytes;
 use crate::tracing::ClientTrace;
 
-#[derive(Clone)]
 pub struct TritonService {
     pub loaded_models: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
-    pub metrics: Arc<MetricsRegistry>,
+    pub local_metrics: LocalMetrics,
 }
 
 impl TritonService {
@@ -31,7 +30,7 @@ impl TritonService {
     ) -> Self {
         TritonService {
             loaded_models: model_map,
-            metrics,
+            local_metrics: LocalMetrics::new(metrics),
         }
     }
 }
@@ -95,22 +94,15 @@ impl GrpcInferenceService for TritonService {
     }
 
     async fn model_infer(&self, request: ModelInferRequest) -> Result<ModelInferResponse, Status> {
-        let mut trace = ClientTrace::start();
+        let mut trace = ClientTrace::start(&self.local_metrics);
         let start = std::time::Instant::now();
         let model_name = request.model_name.clone();
-
         let models = self.loaded_models.load();
 
         let proxy: &ModelProxy = match models.get(&model_name) {
             Some(proxy) => proxy,
             None => {
-                self.metrics
-                    .inference_requests_total
-                    .get_or_create(&vec![
-                        ("model".to_string(), model_name.clone()),
-                        ("status".to_string(), "not_found".to_string()),
-                    ])
-                    .inc();
+                self.local_metrics.inc_requests_not_found(&model_name);
                 return Err(Status {
                     code: Code::NotFound,
                     message: format!("Model {} not found", &model_name),
@@ -163,18 +155,11 @@ impl GrpcInferenceService for TritonService {
             .collect();
         trace.record_output_processed();
 
-        let labels = vec![
-            ("model".to_string(), model_name.clone()),
-            ("status".to_string(), "ok".to_string()),
-        ];
-        self.metrics
-            .inference_requests_total
-            .get_or_create(&labels)
-            .inc();
-        self.metrics
-            .inference_request_duration_seconds
-            .get_or_create(&vec![("model".to_string(), model_name)])
-            .observe(start.elapsed().as_secs_f64());
+        self.local_metrics.inc_requests_ok(&model_name);
+        self.local_metrics
+            .observe_request_duration(&model_name, start.elapsed().as_secs_f64());
+
+        trace.record_metrics(model_name.as_str());
 
         Ok(ModelInferResponse {
             model_name: proxy.model_config.name.clone(),

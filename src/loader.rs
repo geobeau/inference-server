@@ -3,10 +3,7 @@ use std::sync::Arc;
 use ort::session::{RunOptions, Session};
 use smallvec::SmallVec;
 
-use crate::{
-    scheduler::ModelProxy,
-    tensor::supertensor::SessionValues,
-};
+use crate::{scheduler::ModelProxy, tensor::supertensor::SessionValues};
 
 pub struct OnnxExecutor {
     pub id: String,

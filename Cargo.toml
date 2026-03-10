@@ -29,7 +29,7 @@ arc-swap = "1.7.1"
 bytemuck = "1.24.0"
 log = "0.4.28"
 smallvec = "1.15.1"
-prometheus-client = "0.24"
+prometheus = "0.13"
 
 [profile.dev]
 opt-level = 2

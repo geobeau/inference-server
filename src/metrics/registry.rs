@@ -1,71 +1,115 @@
-use prometheus_client::encoding::text::encode;
-use prometheus_client::metrics::counter::Counter;
-use prometheus_client::metrics::family::Family;
-use prometheus_client::metrics::gauge::Gauge;
-use prometheus_client::metrics::histogram::{exponential_buckets, Histogram};
-use prometheus_client::registry::Registry;
-use std::sync::atomic::AtomicI64;
+use prometheus::{
+    exponential_buckets, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, Opts,
+    Registry, TextEncoder,
+};
 
 pub struct MetricsRegistry {
     registry: Registry,
 
-    pub inference_requests_total: Family<Vec<(String, String)>, Counter>,
-    pub inference_batches_total: Family<Vec<(String, String)>, Counter>,
+    pub inference_requests_total: IntCounterVec,
+    pub inference_batches_total: IntCounterVec,
 
-    pub inference_request_duration_seconds: Family<Vec<(String, String)>, Histogram>,
-    pub inference_batch_duration_seconds: Family<Vec<(String, String)>, Histogram>,
+    pub inference_request_duration_seconds: HistogramVec,
+    pub inference_batch_duration_seconds: HistogramVec,
 
-    pub inference_queue_depth: Family<Vec<(String, String)>, Gauge>,
-    pub loaded_models: Gauge<i64, AtomicI64>,
+    pub inference_requests_model_proxy_aquired: HistogramVec,
+    pub inference_requests_serialization_done: HistogramVec,
+    pub inference_requests_inference_in_queue: HistogramVec,
+    pub inference_requests_output_processed: HistogramVec,
+
+    pub inference_queue_depth: IntGauge,
+    pub loaded_models: IntGauge,
+}
+
+fn make_histogram_opts(name: &str, help: &str) -> HistogramOpts {
+    HistogramOpts::new(name, help).buckets(exponential_buckets(0.0001, 2.0, 18).unwrap())
 }
 
 impl MetricsRegistry {
     pub fn new() -> Self {
-        let mut registry = Registry::default();
+        let registry = Registry::new();
 
-        let inference_requests_total = Family::<Vec<(String, String)>, Counter>::default();
-        registry.register(
-            "inference_requests_total",
-            "Total number of inference requests",
-            inference_requests_total.clone(),
-        );
+        let inference_requests_total = IntCounterVec::new(
+            Opts::new("inference_requests_total", "Total number of inference requests"),
+            &["model", "status"],
+        )
+        .unwrap();
+        registry.register(Box::new(inference_requests_total.clone())).unwrap();
 
-        let inference_batches_total = Family::<Vec<(String, String)>, Counter>::default();
-        registry.register(
-            "inference_batches_total",
-            "Total number of inference batches",
-            inference_batches_total.clone(),
-        );
+        let inference_batches_total = IntCounterVec::new(
+            Opts::new("inference_batches_total", "Total number of inference batches"),
+            &["model"],
+        )
+        .unwrap();
+        registry.register(Box::new(inference_batches_total.clone())).unwrap();
 
-        fn make_histogram() -> Histogram {
-            Histogram::new(exponential_buckets(0.0001, 2.0, 18))
-        }
+        let inference_request_duration_seconds = HistogramVec::new(
+            make_histogram_opts(
+                "inference_request_duration_seconds",
+                "Duration of inference requests in seconds",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry.register(Box::new(inference_request_duration_seconds.clone())).unwrap();
 
-        let inference_request_duration_seconds =
-            Family::<Vec<(String, String)>, Histogram>::new_with_constructor(make_histogram);
-        registry.register(
-            "inference_request_duration_seconds",
-            "Duration of inference requests in seconds",
-            inference_request_duration_seconds.clone(),
-        );
+        let inference_batch_duration_seconds = HistogramVec::new(
+            make_histogram_opts(
+                "inference_batch_duration_seconds",
+                "Duration of inference batches in seconds",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry.register(Box::new(inference_batch_duration_seconds.clone())).unwrap();
 
-        let inference_batch_duration_seconds =
-            Family::<Vec<(String, String)>, Histogram>::new_with_constructor(make_histogram);
-        registry.register(
-            "inference_batch_duration_seconds",
-            "Duration of inference batches in seconds",
-            inference_batch_duration_seconds.clone(),
-        );
+        let inference_requests_model_proxy_aquired = HistogramVec::new(
+            make_histogram_opts(
+                "inference_request_model_proxy_aquired_seconds",
+                "STEP 1: How long it took to fetch the reference the model",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry.register(Box::new(inference_requests_model_proxy_aquired.clone())).unwrap();
 
-        let inference_queue_depth = Family::<Vec<(String, String)>, Gauge>::default();
-        registry.register(
-            "inference_queue_depth",
-            "Current depth of the inference queue",
-            inference_queue_depth.clone(),
-        );
+        let inference_requests_serialization_done = HistogramVec::new(
+            make_histogram_opts(
+                "inference_serialization_done_seconds",
+                "STEP 2: How long it took to deserialize from GRPC and serialize to the inner batch structure",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry.register(Box::new(inference_requests_serialization_done.clone())).unwrap();
 
-        let loaded_models = Gauge::<i64, AtomicI64>::default();
-        registry.register("loaded_models", "Number of currently loaded models", loaded_models.clone());
+        let inference_requests_inference_in_queue = HistogramVec::new(
+            make_histogram_opts(
+                "inference_inference_in_queue_seconds",
+                "STEP 3: How long it took to acquire a slot within the inner batch structure and copy data",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry.register(Box::new(inference_requests_inference_in_queue.clone())).unwrap();
+
+        let inference_requests_output_processed = HistogramVec::new(
+            make_histogram_opts(
+                "inference_output_processed_seconds",
+                "STEP 4: How long it took to get output data and to copy them on the response buffer",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry.register(Box::new(inference_requests_output_processed.clone())).unwrap();
+
+        let inference_queue_depth =
+            IntGauge::new("inference_queue_depth", "Current depth of the inference queue").unwrap();
+        registry.register(Box::new(inference_queue_depth.clone())).unwrap();
+
+        let loaded_models =
+            IntGauge::new("loaded_models", "Number of currently loaded models").unwrap();
+        registry.register(Box::new(loaded_models.clone())).unwrap();
 
         Self {
             registry,
@@ -73,14 +117,20 @@ impl MetricsRegistry {
             inference_batches_total,
             inference_request_duration_seconds,
             inference_batch_duration_seconds,
+            inference_requests_model_proxy_aquired,
+            inference_requests_serialization_done,
+            inference_requests_inference_in_queue,
+            inference_requests_output_processed,
             inference_queue_depth,
             loaded_models,
         }
     }
 
     pub fn encode(&self) -> String {
-        let mut buf = String::new();
-        encode(&mut buf, &self.registry).expect("failed to encode metrics");
-        buf
+        let encoder = TextEncoder::new();
+        let metric_families = self.registry.gather();
+        let mut buf = Vec::new();
+        encoder.encode(&metric_families, &mut buf).expect("failed to encode metrics");
+        String::from_utf8(buf).expect("metrics output is not valid UTF-8")
     }
 }

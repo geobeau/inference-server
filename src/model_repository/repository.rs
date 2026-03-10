@@ -1,12 +1,12 @@
 use std::{collections::HashSet, env, path::PathBuf};
 
-use futures::StreamExt;
 use fusio::{
     fs::{Fs, OpenOptions},
     path::Path as FusioPath,
     remotes::aws::{fs::AmazonS3Builder, AwsCredential},
     Read,
 };
+use futures::StreamExt;
 
 use super::config::ModelRepositoryConfig;
 
@@ -106,9 +106,8 @@ impl ModelRepository {
             }
         }
 
-        let version = latest_version.ok_or_else(|| {
-            format!("no version directory found for model '{}'", model_name)
-        })?;
+        let version = latest_version
+            .ok_or_else(|| format!("no version directory found for model '{}'", model_name))?;
 
         // Download model.onnx
         let onnx_key = format!("{}/{}/{}/model.onnx", self.prefix, model_name, version);
