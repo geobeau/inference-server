@@ -175,10 +175,7 @@ impl LocalModelRepository {
     fn load_model(&self, model_name: &str) -> Result<LoadedModel, Box<dyn std::error::Error>> {
         let model_dir = self.root.join(model_name);
 
-        let config_path = model_dir.join("config.yaml");
-        let config_bytes = fs::read(&config_path)?;
-        let config: ModelRepositoryConfig = serde_yaml::from_slice(&config_bytes)?;
-
+        // Discover the latest version directory first
         let mut latest_version: Option<u64> = None;
         for entry in fs::read_dir(&model_dir)? {
             let entry = entry?;
@@ -196,7 +193,26 @@ impl LocalModelRepository {
         let version = latest_version
             .ok_or_else(|| format!("no version directory found for model '{}'", model_name))?;
 
-        let model_path = model_dir.join(version.to_string()).join("model.onnx");
+        let version_dir = model_dir.join(version.to_string());
+
+        // Look for config.yaml in the version directory first, then model root
+        let config_path = {
+            let version_config = version_dir.join("config.yaml");
+            if version_config.exists() {
+                version_config
+            } else {
+                model_dir.join("config.yaml")
+            }
+        };
+        let config_bytes = fs::read(&config_path).map_err(|e| {
+            format!(
+                "failed to read {}: {e} (each model must contain a config.yaml in its model or version directory)",
+                config_path.display()
+            )
+        })?;
+        let config: ModelRepositoryConfig = serde_yaml::from_slice(&config_bytes)?;
+
+        let model_path = version_dir.join("model.onnx");
         if !model_path.exists() {
             return Err(format!(
                 "model.onnx not found at {}",

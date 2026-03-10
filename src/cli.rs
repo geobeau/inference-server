@@ -12,11 +12,11 @@ pub struct Args {
     pub num_cores: usize,
 
     /// ORT intra-op thread pool size (parallelism within a single operator).
-    #[arg(long, default_value_t = 1)]
+    #[arg(long, default_value_t = 5)]
     pub ort_intra_threads: usize,
 
     /// ORT inter-op thread pool size (parallelism between independent operators).
-    #[arg(long, default_value_t = 1)]
+    #[arg(long, default_value_t = 5)]
     pub ort_inter_threads: usize,
 
     // ── Model repository (local or S3, mutually exclusive) ───

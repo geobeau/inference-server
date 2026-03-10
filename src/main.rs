@@ -35,6 +35,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = cli::Args::parse();
     let num_cores = args.num_cores;
 
+    // Validate CLI early so we fail fast before starting gRPC / workers
+    let model_source = args.model_source();
+
+    // Discover models before starting workers so errors surface immediately
+    let discovered: Vec<LoadedModel> = match model_source {
+        cli::ModelSource::Local(path) => {
+            let repo = LocalModelRepository::new(path);
+            repo.load_all().expect("failed to load models from local directory")
+        }
+        cli::ModelSource::S3 { endpoint, bucket, prefix, region, cache_dir } => {
+            let repo = ModelRepository::new(&endpoint, &bucket, &prefix, &region, cache_dir);
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            rt.block_on(repo.load_all()).expect("failed to load models from S3")
+        }
+    };
+    let discovered: Vec<LoadedModel> = if let Some(ref filter) = args.load_models {
+        let allowed: std::collections::HashSet<&str> = filter.iter().map(|s| s.as_str()).collect();
+        discovered.into_iter().filter(|m| allowed.contains(m.name.as_str())).collect()
+    } else {
+        discovered
+    };
+
     let cuda_provider = CUDAExecutionProvider::default()
         .with_device_id(0)
         .build()
@@ -164,27 +189,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Discover models from local directory or S3
-    let discovered: Vec<LoadedModel> = match args.model_source() {
-        cli::ModelSource::Local(path) => {
-            let repo = LocalModelRepository::new(path);
-            repo.load_all().expect("failed to load models from local directory")
-        }
-        cli::ModelSource::S3 { endpoint, bucket, prefix, region, cache_dir } => {
-            let repo = ModelRepository::new(&endpoint, &bucket, &prefix, &region, cache_dir);
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-            rt.block_on(repo.load_all()).expect("failed to load models from S3")
-        }
-    };
-    let discovered = if let Some(ref filter) = args.load_models {
-        let allowed: std::collections::HashSet<&str> = filter.iter().map(|s| s.as_str()).collect();
-        discovered.into_iter().filter(|m| allowed.contains(m.name.as_str())).collect()
-    } else {
-        discovered
-    };
+    // Dispatch discovered models to the runtime manager
     info!("Loading {} models", discovered.len());
     for model in discovered {
         let (reply_tx, _reply_rx) = tokio::sync::oneshot::channel();

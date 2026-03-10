@@ -109,6 +109,55 @@ impl GrpcInferenceService for TritonService {
         };
         trace.record_model_proxy_aquired();
 
+        // Validate input shapes against model config (except dim 0 which is batch)
+        for req_input in &request.inputs {
+            let model_input = proxy
+                .model_config
+                .input
+                .iter()
+                .find(|i| i.name == req_input.name)
+                .ok_or_else(|| Status {
+                    code: Code::InvalidArgument,
+                    message: format!("Unknown input '{}' in request", req_input.name),
+                })?;
+
+            // Validate shape dimensions (skip dim 0 which is batch size)
+            let req_shape: Vec<i64> = req_input.shape.clone().into_iter().collect();
+            let model_shape: Vec<i64> = model_input.dims.clone();
+
+            if req_shape.len() != model_shape.len() {
+                return Err(Status {
+                    code: Code::InvalidArgument,
+                    message: format!(
+                        "Input '{}' shape rank mismatch: expected {}, got {}",
+                        req_input.name,
+                        model_shape.len(),
+                        req_shape.len()
+                    ),
+                });
+            }
+
+            for (i, (req_dim, model_dim)) in req_shape.iter().zip(model_shape.iter()).enumerate() {
+                if i == 0 {
+                    // Dim 0 (batch) is always validated - just check it's positive
+                    if *req_dim <= 0 {
+                        return Err(Status {
+                            code: Code::InvalidArgument,
+                            message: format!("Input '{}' batch size must be positive, got {}", req_input.name, req_dim),
+                        });
+                    }
+                } else if *req_dim != *model_dim {
+                    return Err(Status {
+                        code: Code::InvalidArgument,
+                        message: format!(
+                            "Input '{}' dimension {} mismatch: expected {}, got {}",
+                            req_input.name, i, model_dim, req_dim
+                        ),
+                    });
+                }
+            }
+        }
+
         let mut ordered_inputs = request.inputs.iter().enumerate().collect::<Vec<_>>();
 
         ordered_inputs.sort_by_key(|(_, req_input)| {

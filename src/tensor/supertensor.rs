@@ -1,6 +1,7 @@
 use std::{
     cell::UnsafeCell,
     cmp::min,
+    collections::HashMap,
     sync::{
         atomic::{fence, AtomicUsize, Ordering},
         Arc,
@@ -16,6 +17,7 @@ use ort::{
     value::{Outlet, Shape, TensorElementType, Value},
 };
 use smallvec::SmallVec;
+use tracing::info;
 use std::time::Instant;
 use tokio::sync::{futures::Notified, Notify};
 
@@ -254,9 +256,22 @@ impl SuperTensorBuffer {
         inputs: &Vec<&Outlet>,
         allocator: &Allocator,
     ) -> Result<SuperTensorBuffer, ()> {
+        Self::new_with_overrides(capacity, batch_size, inputs, allocator, &HashMap::new())
+    }
+
+    pub fn new_with_overrides(
+        capacity: usize,
+        batch_size: usize,
+        inputs: &Vec<&Outlet>,
+        allocator: &Allocator,
+        shape_overrides: &HashMap<String, Vec<i64>>,
+    ) -> Result<SuperTensorBuffer, ()> {
         {
             if !is_power_of_two(capacity) {
-                panic!("Buffer is not power of 2: {capacity}")
+                panic!("Capacity is not power of 2: {capacity}")
+            }
+            if !is_power_of_two(batch_size) {
+                panic!("Batch size is not power of 2: {capacity}")
             }
             let mut input_tensors = Vec::with_capacity(capacity);
 
@@ -274,8 +289,22 @@ impl SuperTensorBuffer {
                         ort::value::ValueType::Optional(_value_type) => todo!(),
                     };
 
+                    // Apply shape override if specified for this input
+                    let effective_shape = if let Some(override_shape) = shape_overrides.get(input.name()) {
+                        // Create a new shape with overridden dimensions (except dim 0 which is batch)
+                        let mut new_shape = shape.clone();
+                        for (i, override_dim) in override_shape.iter().enumerate() {
+                            if i > 0 && i < new_shape.len() {
+                                new_shape[i] = *override_dim;
+                            }
+                        }
+                        new_shape
+                    } else {
+                        shape.clone()
+                    };
+
                     batched_input_tensors.push(UnsafeCell::from(BatchableTensor::new(
-                        *ty, shape, batch_size, allocator,
+                        *ty, &effective_shape, batch_size, allocator,
                     )));
                 });
                 input_tensors.push(batched_input_tensors);

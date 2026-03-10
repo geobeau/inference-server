@@ -503,6 +503,7 @@ use ort::{
     session::SessionOutputs,
     value::{DynTensor, DynValue, Shape, Tensor, TensorElementType, Value},
 };
+use tracing::info;
 
 use crate::grpc::inference::DataType;
 

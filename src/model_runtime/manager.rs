@@ -114,9 +114,14 @@ impl ModelRuntimeManager {
         .map_err(|e| LoadError::AllocatorCreate(e.to_string()))?;
 
         let inputs_ref: Vec<_> = first_session.inputs().iter().collect();
-        let super_tensor_buffer =
-            SuperTensorBuffer::new(capacity, batch_size, &inputs_ref, &allocator)
-                .map_err(|_| LoadError::SuperTensorBuild)?;
+        let super_tensor_buffer = SuperTensorBuffer::new_with_overrides(
+            capacity,
+            batch_size,
+            &inputs_ref,
+            &allocator,
+            &config.input_shapes,
+        )
+        .map_err(|_| LoadError::SuperTensorBuild)?;
 
         let metadata_name = first_session
             .metadata()
@@ -129,16 +134,28 @@ impl ModelRuntimeManager {
             .iter()
             .map(|input| {
                 let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
-                let tensor_shape: Vec<i64> = input
+                
+                // Get the base shape from the model
+                let mut tensor_shape: Vec<i64> = input
                     .dtype()
                     .tensor_shape()
                     .unwrap()
                     .iter()
-                    .enumerate()
-                    .skip_while(|(i, dim)| *i == 0 && **dim == -1 && batch_size > 0)
-                    .map(|(_, dim)| dim)
                     .cloned()
                     .collect();
+                
+                // Apply shape override if specified for this input
+                if let Some(override_shape) = config.input_shapes.get(input.name()) {
+                    // Merge override shape with model shape
+                    // Override shape has same rank as model shape
+                    // Dim 0 is -1 (batch) in both, will be replaced at request time
+                    for (i, override_dim) in override_shape.iter().enumerate() {
+                        if i < tensor_shape.len() {
+                            tensor_shape[i] = *override_dim;
+                        }
+                    }
+                }
+                
                 ModelInput {
                     name: input.name().to_string(),
                     data_type: (*tensor_type).into(),
@@ -158,16 +175,26 @@ impl ModelRuntimeManager {
             .iter()
             .map(|output| {
                 let tensor_type: &DataType = &output.dtype().tensor_type().unwrap().into();
-                let tensor_shape: Vec<i64> = output
+                
+                // Get the base shape from the model
+                let mut tensor_shape: Vec<i64> = output
                     .dtype()
                     .tensor_shape()
                     .unwrap()
                     .iter()
-                    .enumerate()
-                    .skip_while(|(i, dim)| *i == 0 && **dim == -1)
-                    .map(|(_, dim)| dim)
                     .cloned()
                     .collect();
+                
+                // Apply shape override if specified for this output
+                if let Some(override_shape) = config.output_shapes.get(output.name()) {
+                    // Merge override shape with model shape
+                    for (i, override_dim) in override_shape.iter().enumerate() {
+                        if i < tensor_shape.len() {
+                            tensor_shape[i] = *override_dim;
+                        }
+                    }
+                }
+                
                 ModelOutput {
                     name: output.name().to_string(),
                     data_type: (*tensor_type).into(),
@@ -187,17 +214,30 @@ impl ModelRuntimeManager {
             .enumerate()
             .map(|(i, input)| {
                 let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
-                let tensor_shape: Vec<i64> = input
+                
+                // Get the base shape from the model
+                let mut tensor_shape: Vec<i64> = input
                     .dtype()
                     .tensor_shape()
                     .unwrap()
                     .iter()
                     .cloned()
                     .collect();
-                let mut input_shape = input.dtype().tensor_shape().unwrap().clone();
+                
+                // Apply shape override if specified for this input
+                if let Some(override_shape) = config.input_shapes.get(input.name()) {
+                    // Merge override shape with model shape
+                    for (i, override_dim) in override_shape.iter().enumerate() {
+                        if i < tensor_shape.len() {
+                            tensor_shape[i] = *override_dim;
+                        }
+                    }
+                }
+                
+                let mut input_shape = tensor_shape.clone();
                 input_shape[0] = 1;
                 let input_metadata = ModelInputMetadata {
-                    shape: input_shape,
+                    shape: ort::value::Shape::from(input_shape),
                     order: i,
                 };
                 input_set.insert(input.name().to_string(), input_metadata);
@@ -214,13 +254,26 @@ impl ModelRuntimeManager {
             .iter()
             .map(|output| {
                 let tensor_type: &DataType = &output.dtype().tensor_type().unwrap().into();
-                let tensor_shape: Vec<i64> = output
+                
+                // Get the base shape from the model
+                let mut tensor_shape: Vec<i64> = output
                     .dtype()
                     .tensor_shape()
                     .unwrap()
                     .iter()
                     .cloned()
                     .collect();
+                
+                // Apply shape override if specified for this output
+                if let Some(override_shape) = config.output_shapes.get(output.name()) {
+                    // Merge override shape with model shape
+                    for (i, override_dim) in override_shape.iter().enumerate() {
+                        if i < tensor_shape.len() {
+                            tensor_shape[i] = *override_dim;
+                        }
+                    }
+                }
+                
                 TensorMetadata {
                     name: output.name().to_string(),
                     datatype: tensor_type.to_metadata_string(),
