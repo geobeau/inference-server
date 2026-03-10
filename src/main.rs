@@ -18,7 +18,7 @@ use ort::{environment::GlobalThreadPoolOptions, execution_providers::CUDAExecuti
 
 use crate::{
     grpc::{inference::GrpcInferenceServiceServer, TritonService},
-    model_repository::ModelRepository,
+    model_repository::{LoadedModel, LocalModelRepository, ModelRepository},
     model_runtime::{LoadModelRequest, ModelRuntimeManager, SessionStarter},
 };
 
@@ -164,20 +164,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Discover and load models from S3
-    let repo = ModelRepository::new(
-        &args.s3_endpoint,
-        &args.s3_bucket,
-        &args.s3_prefix,
-        &args.s3_region,
-        args.model_cache_dir,
-    );
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-    let discovered = rt.block_on(repo.load_all()).expect("failed to load models from S3");
-    info!("Discovered {} models from S3", discovered.len());
+    // Discover models from local directory or S3
+    let discovered: Vec<LoadedModel> = match args.model_source() {
+        cli::ModelSource::Local(path) => {
+            let repo = LocalModelRepository::new(path);
+            repo.load_all().expect("failed to load models from local directory")
+        }
+        cli::ModelSource::S3 { endpoint, bucket, prefix, region, cache_dir } => {
+            let repo = ModelRepository::new(&endpoint, &bucket, &prefix, &region, cache_dir);
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            rt.block_on(repo.load_all()).expect("failed to load models from S3")
+        }
+    };
+    let discovered = if let Some(ref filter) = args.load_models {
+        let allowed: std::collections::HashSet<&str> = filter.iter().map(|s| s.as_str()).collect();
+        discovered.into_iter().filter(|m| allowed.contains(m.name.as_str())).collect()
+    } else {
+        discovered
+    };
+    info!("Loading {} models", discovered.len());
     for model in discovered {
         let (reply_tx, _reply_rx) = tokio::sync::oneshot::channel();
         load_tx.blocking_send(LoadModelRequest {

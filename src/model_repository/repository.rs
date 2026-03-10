@@ -1,4 +1,4 @@
-use std::{collections::HashSet, env, path::PathBuf};
+use std::{collections::HashSet, env, fs, path::PathBuf};
 
 use fusio::{
     fs::{Fs, OpenOptions},
@@ -144,5 +144,72 @@ impl ModelRepository {
         let (result, buf) = file.read_to_end_at(Vec::new(), 0).await;
         result?;
         Ok(buf)
+    }
+}
+
+pub struct LocalModelRepository {
+    root: PathBuf,
+}
+
+impl LocalModelRepository {
+    pub fn new(root: PathBuf) -> Self {
+        Self { root }
+    }
+
+    pub fn load_all(&self) -> Result<Vec<LoadedModel>, Box<dyn std::error::Error>> {
+        let mut loaded_models = Vec::new();
+        for entry in fs::read_dir(&self.root)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                let model_name = entry
+                    .file_name()
+                    .into_string()
+                    .map_err(|_| "non-UTF8 model directory name")?;
+                let model = self.load_model(&model_name)?;
+                loaded_models.push(model);
+            }
+        }
+        Ok(loaded_models)
+    }
+
+    fn load_model(&self, model_name: &str) -> Result<LoadedModel, Box<dyn std::error::Error>> {
+        let model_dir = self.root.join(model_name);
+
+        let config_path = model_dir.join("config.yaml");
+        let config_bytes = fs::read(&config_path)?;
+        let config: ModelRepositoryConfig = serde_yaml::from_slice(&config_bytes)?;
+
+        let mut latest_version: Option<u64> = None;
+        for entry in fs::read_dir(&model_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                if let Some(name) = entry.file_name().to_str() {
+                    if let Ok(v) = name.parse::<u64>() {
+                        if latest_version.map_or(true, |cur| v > cur) {
+                            latest_version = Some(v);
+                        }
+                    }
+                }
+            }
+        }
+
+        let version = latest_version
+            .ok_or_else(|| format!("no version directory found for model '{}'", model_name))?;
+
+        let model_path = model_dir.join(version.to_string()).join("model.onnx");
+        if !model_path.exists() {
+            return Err(format!(
+                "model.onnx not found at {}",
+                model_path.display()
+            )
+            .into());
+        }
+
+        Ok(LoadedModel {
+            name: model_name.to_string(),
+            version,
+            model_path,
+            config,
+        })
     }
 }
