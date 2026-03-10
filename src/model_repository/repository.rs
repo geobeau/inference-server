@@ -12,6 +12,7 @@ use super::config::ModelRepositoryConfig;
 
 pub struct LoadedModel {
     pub name: String,
+    pub version: u64,
     pub model_path: PathBuf,
     pub config: ModelRepositoryConfig,
 }
@@ -23,7 +24,13 @@ pub struct ModelRepository {
 }
 
 impl ModelRepository {
-    pub fn new(bucket: &str, prefix: &str, region: &str, cache_dir: PathBuf) -> Self {
+    pub fn new(
+        endpoint: &str,
+        bucket: &str,
+        prefix: &str,
+        region: &str,
+        cache_dir: PathBuf,
+    ) -> Self {
         let key_id = env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID must be set");
         let secret_key =
             env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY must be set");
@@ -34,6 +41,7 @@ impl ModelRepository {
                 secret_key,
                 token: None,
             })
+            .endpoint(endpoint.into())
             .region(region.into())
             .sign_payload(true)
             .build();
@@ -124,6 +132,7 @@ impl ModelRepository {
 
         Ok(LoadedModel {
             name: model_name.to_string(),
+            version,
             model_path: local_path,
             config,
         })

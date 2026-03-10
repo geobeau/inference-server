@@ -1,3 +1,4 @@
+mod cli;
 mod grpc;
 mod loader;
 mod metrics;
@@ -7,22 +8,20 @@ mod scheduler;
 mod tensor;
 mod tracing;
 use arc_swap::ArcSwap;
+use clap::Parser;
 use pajamax::{serve, Server};
 use ::tracing::info;
 use tracing_subscriber::EnvFilter;
-use std::path::PathBuf;
 use std::{collections::HashMap, sync::Arc};
 
 use ort::{environment::GlobalThreadPoolOptions, execution_providers::CUDAExecutionProvider};
 
 use crate::{
     grpc::{inference::GrpcInferenceServiceServer, TritonService},
-    model_repository::config::{AllocatorKind, Backend, ModelRepositoryConfig},
+    model_repository::ModelRepository,
     model_runtime::{LoadModelRequest, ModelRuntimeManager, SessionStarter},
 };
 
-// Current worker that I use is 16 vcpu: 12 is for compio and 4 are dedicated to onnx (see with_intra_threads, minus 1)
-// TODO: make this configurable
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -33,16 +32,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(true)
         .init();
 
-    let num_cores = 16;
+    let args = cli::Args::parse();
+    let num_cores = args.num_cores;
 
     let cuda_provider = CUDAExecutionProvider::default()
         .with_device_id(0)
         .build()
         .error_on_failure();
     let thread_pool = GlobalThreadPoolOptions::default()
-        .with_intra_threads(7)
+        .with_intra_threads(args.ort_intra_threads)
         .unwrap()
-        .with_inter_threads(4)
+        .with_inter_threads(args.ort_inter_threads)
         .unwrap()
         .with_spin_control(false)
         .unwrap();
@@ -164,21 +164,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Send initial model load request
-    let (reply_tx, _reply_rx) = tokio::sync::oneshot::channel();
-    load_tx.blocking_send(LoadModelRequest {
-        model_name: String::from("Int64ToFloat64Model"),
-        version: 1,
-        model_path: PathBuf::from("samples/model.onnx"),
-        config: ModelRepositoryConfig {
-            backend: Backend::Supertensor,
-            batch_size: 256,
-            capacity: 32,
-            num_executors: 10,
-            allocator: AllocatorKind::CudaPinned,
-        },
-        reply: reply_tx,
-    })?;
+    // Discover and load models from S3
+    let repo = ModelRepository::new(
+        &args.s3_endpoint,
+        &args.s3_bucket,
+        &args.s3_prefix,
+        &args.s3_region,
+        args.model_cache_dir,
+    );
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let discovered = rt.block_on(repo.load_all()).expect("failed to load models from S3");
+    info!("Discovered {} models from S3", discovered.len());
+    for model in discovered {
+        let (reply_tx, _reply_rx) = tokio::sync::oneshot::channel();
+        load_tx.blocking_send(LoadModelRequest {
+            model_name: model.name,
+            version: model.version,
+            model_path: model.model_path,
+            config: model.config,
+            reply: reply_tx,
+        })?;
+    }
 
     for h in handles {
         h.join().expect("worker thread panicked");
