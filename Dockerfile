@@ -48,7 +48,7 @@ COPY . .
 RUN cargo build --release
 
 # Create non-root user
-RUN useradd --create-home --shell /bin/bash appuser
-USER appuser
+RUN useradd --create-home --shell /bin/bash --uid 1000 appuser
+USER 1000
 
 ENTRYPOINT ["/build/inference-server/target/release/inference-server"]
