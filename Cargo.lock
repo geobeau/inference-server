@@ -1845,6 +1845,7 @@ dependencies = [
 [[package]]
 name = "pajamax"
 version = "0.4.0"
+source = "git+https://github.com/geobeau/pajamax?branch=main#275187ba7e45ecac12df7b64441e314736595d44"
 dependencies = [
  "async-trait",
  "compio",
@@ -1858,6 +1859,7 @@ dependencies = [
 [[package]]
 name = "pajamax-build"
 version = "0.4.0"
+source = "git+https://github.com/geobeau/pajamax?branch=main#275187ba7e45ecac12df7b64441e314736595d44"
 dependencies = [
  "prost-build",
 ]

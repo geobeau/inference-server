@@ -1,0 +1,48 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    protobuf-compiler \
+    wget \
+    btop \
+    ca-certificates \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install CUDA 13 (toolkit 13.0)
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \
+    && dpkg -i cuda-keyring_1.1-1_all.deb \
+    && rm cuda-keyring_1.1-1_all.deb \
+    && apt-get update \
+    && apt-get install -y cuda-toolkit-13-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PATH="/usr/local/cuda/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+
+# Install Rust nightly
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Download and install ONNX Runtime CUDA 13
+RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.24.3/onnxruntime-linux-x64-gpu_cuda13-1.24.3.tgz \
+    && tar -xzf onnxruntime-linux-x64-gpu_cuda13-1.24.3.tgz -C /opt \
+    && rm onnxruntime-linux-x64-gpu_cuda13-1.24.3.tgz
+
+# Set ONNX Runtime environment variables
+ENV ORT_LIB_LOCATION="/opt/onnxruntime-linux-x64-gpu_cuda13-1.24.3/lib"
+ENV ORT_DYLIB_PATH="/opt/onnxruntime-linux-x64-gpu_cuda13-1.24.3/lib/libonnxruntime.so"
+ENV LD_LIBRARY_PATH="${ORT_LIB_LOCATION}:${LD_LIBRARY_PATH}"
+
+# Copy project source
+WORKDIR /build/inference-server
+COPY . .
+
+# Build the project
+RUN cargo build --release

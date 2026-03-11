@@ -101,7 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = pajamax::Config::new()
         .max_concurrent_connections(100000)
         .max_concurrent_streams(100000)
-        .max_frame_size(32 * 1024);
+        .max_frame_size(16 * 1024 * 1024);
 
     let grpc_loaded_models = loaded_models.clone();
     let services: Vec<Box<dyn Fn() -> std::rc::Rc<dyn pajamax::PajamaxService> + Send + Sync>> =

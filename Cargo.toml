@@ -18,7 +18,7 @@ serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
 # GRPC Stuff
 #pajamax = { git = "https://github.com/geobeau/pajamax", branch = "main"}
-pajamax = { path = "../pajamax/pajamax"}
+pajamax = { git = "https://github.com/geobeau/pajamax", branch = "main" }
 prost = "0.14"
 prost-types = "0.14"
 async-trait = "0.1"
@@ -38,5 +38,5 @@ opt-level = 2
 panic = 'abort'
 
 [build-dependencies]
-pajamax-build = { path = "../pajamax/pajamax-build"}
+pajamax-build = { git = "https://github.com/geobeau/pajamax", branch = "main" }
 prost-build = "0.14"
