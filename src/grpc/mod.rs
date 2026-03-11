@@ -188,11 +188,10 @@ impl GrpcInferenceService for TritonService {
         let output_metadata = inference_outputs.get_data(&mut raw_output).await;
         let outputs = output_metadata
             .iter()
-            .map(|(data_type, shape)| {
-                // TODO: cache the metadata to avoid recomputing everytime
+            .zip(proxy.model_metadata.output_meta.iter())
+            .map(|((data_type, shape), meta)| {
                 InferOutputTensor {
-                    // TODO URGENT: replace the output name
-                    name: String::from("x"),
+                    name: meta.name.clone(),
                     datatype: DataType::from(*data_type).as_str_name().to_string(),
                     shape: Vec::from(shape.deref()),
                     parameters: HashMap::new(),
