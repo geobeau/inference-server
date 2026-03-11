@@ -36,8 +36,8 @@ RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.24.3/o
     && rm onnxruntime-linux-x64-gpu_cuda13-1.24.3.tgz
 
 # Set ONNX Runtime environment variables
-ENV ORT_LIB_LOCATION="/opt/onnxruntime-linux-x64-gpu_cuda13-1.24.3/lib"
-ENV ORT_DYLIB_PATH="/opt/onnxruntime-linux-x64-gpu_cuda13-1.24.3/lib/libonnxruntime.so"
+ENV ORT_LIB_LOCATION="/opt/onnxruntime-linux-x64-gpu-1.24.3/lib"
+ENV ORT_DYLIB_PATH="/opt/onnxruntime-linux-x64-gpu-1.24.3/lib/libonnxruntime.so"
 ENV LD_LIBRARY_PATH="${ORT_LIB_LOCATION}:${LD_LIBRARY_PATH}"
 
 # Copy project source
