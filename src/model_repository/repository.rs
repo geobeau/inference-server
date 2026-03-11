@@ -19,6 +19,7 @@ pub struct LoadedModel {
 
 pub struct ModelRepository {
     fs: fusio::remotes::aws::fs::AmazonS3,
+    bucket: String,
     prefix: String,
     local_cache_dir: PathBuf,
 }
@@ -48,6 +49,7 @@ impl ModelRepository {
 
         Self {
             fs,
+            bucket: bucket.to_string(),
             prefix: prefix.trim_matches('/').to_string(),
             local_cache_dir: cache_dir,
         }
@@ -88,8 +90,11 @@ impl ModelRepository {
     ) -> Result<LoadedModel, Box<dyn std::error::Error>> {
         // Download and parse config.yaml
         let config_key = format!("{}/{}/config.yaml", self.prefix, model_name);
-        let config_bytes = self.read_file(&config_key).await?;
-        let config: ModelRepositoryConfig = serde_yaml::from_slice(&config_bytes)?;
+        let config_bytes = self.read_file(&config_key).await.map_err(|e| {
+            format!("failed to fetch config.yaml for model '{}' at s3://{}/{}: {}", model_name, self.bucket, config_key, e)
+        })?;
+        let config: ModelRepositoryConfig = serde_yaml::from_slice(&config_bytes)
+            .map_err(|e| format!("failed to parse config.yaml for model '{}': {}", model_name, e))?;
 
         // Find the latest version directory
         let model_prefix = format!("{}/{}", self.prefix, model_name);
@@ -119,7 +124,9 @@ impl ModelRepository {
 
         // Download model.onnx
         let onnx_key = format!("{}/{}/{}/model.onnx", self.prefix, model_name, version);
-        let onnx_bytes = self.read_file(&onnx_key).await?;
+        let onnx_bytes = self.read_file(&onnx_key).await.map_err(|e| {
+            format!("failed to fetch model.onnx for model '{}' (version {}) at s3://{}/{}: {}", model_name, version, self.bucket, onnx_key, e)
+        })?;
 
         // Write to local cache
         let local_dir = self
