@@ -46,3 +46,5 @@ COPY . .
 
 # Build the project
 RUN cargo build --release
+
+ENTRYPOINT ["/build/inference-server/target/release/inference-server"]
