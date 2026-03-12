@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
     btop \
     ca-certificates \
     gnupg \
+    gdb \ 
+    linux-tools-generic \
     && rm -rf /var/lib/apt/lists/*
 
 # Install CUDA 13 (toolkit 13.0)
@@ -48,7 +50,7 @@ COPY . .
 RUN cargo build --release
 
 # Create non-root user
-RUN useradd --create-home --shell /bin/bash --uid 1000 appuser
-USER 1000
+RUN useradd --create-home --shell /bin/bash --uid 1001 appuser
+USER 1001
 
 ENTRYPOINT ["/build/inference-server/target/release/inference-server"]
