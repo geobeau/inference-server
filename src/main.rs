@@ -191,15 +191,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Dispatch discovered models to the runtime manager
     info!("Loading {} models", discovered.len());
+    let mut load_replies = Vec::new();
     for model in discovered {
-        let (reply_tx, _reply_rx) = tokio::sync::oneshot::channel();
+        let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
         load_tx.blocking_send(LoadModelRequest {
-            model_name: model.name,
+            model_name: model.name.clone(),
             version: model.version,
             model_path: model.model_path,
             config: model.config,
             reply: reply_tx,
         })?;
+        load_replies.push((model.name, reply_rx));
+    }
+    for (name, reply_rx) in load_replies {
+        match reply_rx.blocking_recv() {
+            Ok(Ok(())) => info!("Model {} loaded successfully", name),
+            Ok(Err(e)) => panic!("Failed to load model {}: {:?}", name, e),
+            Err(_) => panic!("Model loader dropped without responding for {}", name),
+        }
     }
 
     for h in handles {
