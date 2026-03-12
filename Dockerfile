@@ -22,7 +22,7 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86
     && dpkg -i cuda-keyring_1.1-1_all.deb \
     && rm cuda-keyring_1.1-1_all.deb \
     && apt-get update \
-    && apt-get install -y cuda-toolkit-13-0 \
+    && apt-get install -y cuda-toolkit-13-0 libcudnn9-cuda-13 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/usr/local/cuda/bin:${PATH}"
