@@ -40,8 +40,10 @@ impl ClientTrace {
     }
 
     pub fn record_metrics(&self, model_name: &str, local_metrics: &LocalMetrics) {
-        local_metrics
-            .observe_model_proxy_aquired(model_name, self.model_proxy_aquired.unwrap().as_secs_f64());
+        local_metrics.observe_model_proxy_aquired(
+            model_name,
+            self.model_proxy_aquired.unwrap().as_secs_f64(),
+        );
         local_metrics
             .observe_serialization_done(model_name, self.serialization_done.unwrap().as_secs_f64());
         local_metrics

@@ -1,6 +1,6 @@
 use prometheus::{
-    exponential_buckets, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, Opts,
-    Registry, TextEncoder,
+    exponential_buckets, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGauge,
+    IntGaugeVec, Opts, Registry, TextEncoder,
 };
 
 pub struct MetricsRegistry {
@@ -11,6 +11,7 @@ pub struct MetricsRegistry {
 
     pub inference_request_duration_seconds: HistogramVec,
     pub inference_batch_duration_seconds: HistogramVec,
+    pub inference_model_execution_seconds: HistogramVec,
 
     pub inference_requests_model_proxy_aquired: HistogramVec,
     pub inference_requests_serialization_done: HistogramVec,
@@ -18,6 +19,10 @@ pub struct MetricsRegistry {
     pub inference_requests_output_processed: HistogramVec,
 
     pub inference_queue_depth: IntGauge,
+    pub inference_executors_in_use: IntGaugeVec,
+    pub inference_ring_tail_index: IntGaugeVec,
+    pub inference_ring_in_use_index: IntGaugeVec,
+    pub inference_ring_head_index: IntGaugeVec,
     pub loaded_models: IntGauge,
 }
 
@@ -30,18 +35,28 @@ impl MetricsRegistry {
         let registry = Registry::new();
 
         let inference_requests_total = IntCounterVec::new(
-            Opts::new("inference_requests_total", "Total number of inference requests"),
+            Opts::new(
+                "inference_requests_total",
+                "Total number of inference requests",
+            ),
             &["model", "status"],
         )
         .unwrap();
-        registry.register(Box::new(inference_requests_total.clone())).unwrap();
+        registry
+            .register(Box::new(inference_requests_total.clone()))
+            .unwrap();
 
         let inference_batches_total = IntCounterVec::new(
-            Opts::new("inference_batches_total", "Total number of inference batches"),
+            Opts::new(
+                "inference_batches_total",
+                "Total number of inference batches",
+            ),
             &["model"],
         )
         .unwrap();
-        registry.register(Box::new(inference_batches_total.clone())).unwrap();
+        registry
+            .register(Box::new(inference_batches_total.clone()))
+            .unwrap();
 
         let inference_request_duration_seconds = HistogramVec::new(
             make_histogram_opts(
@@ -51,7 +66,9 @@ impl MetricsRegistry {
             &["model"],
         )
         .unwrap();
-        registry.register(Box::new(inference_request_duration_seconds.clone())).unwrap();
+        registry
+            .register(Box::new(inference_request_duration_seconds.clone()))
+            .unwrap();
 
         let inference_batch_duration_seconds = HistogramVec::new(
             make_histogram_opts(
@@ -61,7 +78,21 @@ impl MetricsRegistry {
             &["model"],
         )
         .unwrap();
-        registry.register(Box::new(inference_batch_duration_seconds.clone())).unwrap();
+        registry
+            .register(Box::new(inference_batch_duration_seconds.clone()))
+            .unwrap();
+
+        let inference_model_execution_seconds = HistogramVec::new(
+            make_histogram_opts(
+                "inference_model_execution_seconds",
+                "Duration of model execution (ORT session run) in seconds",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry
+            .register(Box::new(inference_model_execution_seconds.clone()))
+            .unwrap();
 
         let inference_requests_model_proxy_aquired = HistogramVec::new(
             make_histogram_opts(
@@ -71,7 +102,9 @@ impl MetricsRegistry {
             &["model"],
         )
         .unwrap();
-        registry.register(Box::new(inference_requests_model_proxy_aquired.clone())).unwrap();
+        registry
+            .register(Box::new(inference_requests_model_proxy_aquired.clone()))
+            .unwrap();
 
         let inference_requests_serialization_done = HistogramVec::new(
             make_histogram_opts(
@@ -81,7 +114,9 @@ impl MetricsRegistry {
             &["model"],
         )
         .unwrap();
-        registry.register(Box::new(inference_requests_serialization_done.clone())).unwrap();
+        registry
+            .register(Box::new(inference_requests_serialization_done.clone()))
+            .unwrap();
 
         let inference_requests_inference_in_queue = HistogramVec::new(
             make_histogram_opts(
@@ -91,7 +126,9 @@ impl MetricsRegistry {
             &["model"],
         )
         .unwrap();
-        registry.register(Box::new(inference_requests_inference_in_queue.clone())).unwrap();
+        registry
+            .register(Box::new(inference_requests_inference_in_queue.clone()))
+            .unwrap();
 
         let inference_requests_output_processed = HistogramVec::new(
             make_histogram_opts(
@@ -101,11 +138,66 @@ impl MetricsRegistry {
             &["model"],
         )
         .unwrap();
-        registry.register(Box::new(inference_requests_output_processed.clone())).unwrap();
+        registry
+            .register(Box::new(inference_requests_output_processed.clone()))
+            .unwrap();
 
-        let inference_queue_depth =
-            IntGauge::new("inference_queue_depth", "Current depth of the inference queue").unwrap();
-        registry.register(Box::new(inference_queue_depth.clone())).unwrap();
+        let inference_queue_depth = IntGauge::new(
+            "inference_queue_depth",
+            "Current depth of the inference queue",
+        )
+        .unwrap();
+        registry
+            .register(Box::new(inference_queue_depth.clone()))
+            .unwrap();
+
+        let inference_executors_in_use = IntGaugeVec::new(
+            Opts::new(
+                "inference_executors_in_use",
+                "Number of executors currently running a batch",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry
+            .register(Box::new(inference_executors_in_use.clone()))
+            .unwrap();
+
+        let inference_ring_tail_index = IntGaugeVec::new(
+            Opts::new(
+                "inference_ring_tail_index",
+                "Current ring buffer tail index",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry
+            .register(Box::new(inference_ring_tail_index.clone()))
+            .unwrap();
+
+        let inference_ring_in_use_index = IntGaugeVec::new(
+            Opts::new(
+                "inference_ring_in_use_index",
+                "Current ring buffer in-use index",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry
+            .register(Box::new(inference_ring_in_use_index.clone()))
+            .unwrap();
+
+        let inference_ring_head_index = IntGaugeVec::new(
+            Opts::new(
+                "inference_ring_head_index",
+                "Current ring buffer head index",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry
+            .register(Box::new(inference_ring_head_index.clone()))
+            .unwrap();
 
         let loaded_models =
             IntGauge::new("loaded_models", "Number of currently loaded models").unwrap();
@@ -117,11 +209,16 @@ impl MetricsRegistry {
             inference_batches_total,
             inference_request_duration_seconds,
             inference_batch_duration_seconds,
+            inference_model_execution_seconds,
             inference_requests_model_proxy_aquired,
             inference_requests_serialization_done,
             inference_requests_inference_in_queue,
             inference_requests_output_processed,
             inference_queue_depth,
+            inference_executors_in_use,
+            inference_ring_tail_index,
+            inference_ring_in_use_index,
+            inference_ring_head_index,
             loaded_models,
         }
     }
@@ -130,7 +227,9 @@ impl MetricsRegistry {
         let encoder = TextEncoder::new();
         let metric_families = self.registry.gather();
         let mut buf = Vec::new();
-        encoder.encode(&metric_families, &mut buf).expect("failed to encode metrics");
+        encoder
+            .encode(&metric_families, &mut buf)
+            .expect("failed to encode metrics");
         String::from_utf8(buf).expect("metrics output is not valid UTF-8")
     }
 }

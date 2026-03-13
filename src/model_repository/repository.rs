@@ -91,10 +91,17 @@ impl ModelRepository {
         // Download and parse config.yaml
         let config_key = format!("{}/{}/config.yaml", self.prefix, model_name);
         let config_bytes = self.read_file(&config_key).await.map_err(|e| {
-            format!("failed to fetch config.yaml for model '{}' at s3://{}/{}: {}", model_name, self.bucket, config_key, e)
+            format!(
+                "failed to fetch config.yaml for model '{}' at s3://{}/{}: {}",
+                model_name, self.bucket, config_key, e
+            )
         })?;
-        let config: ModelRepositoryConfig = serde_yaml::from_slice(&config_bytes)
-            .map_err(|e| format!("failed to parse config.yaml for model '{}': {}", model_name, e))?;
+        let config: ModelRepositoryConfig = serde_yaml::from_slice(&config_bytes).map_err(|e| {
+            format!(
+                "failed to parse config.yaml for model '{}': {}",
+                model_name, e
+            )
+        })?;
 
         // Find the latest version directory
         let model_prefix = format!("{}/{}", self.prefix, model_name);
@@ -125,7 +132,10 @@ impl ModelRepository {
         // Download model.onnx
         let onnx_key = format!("{}/{}/{}/model.onnx", self.prefix, model_name, version);
         let onnx_bytes = self.read_file(&onnx_key).await.map_err(|e| {
-            format!("failed to fetch model.onnx for model '{}' (version {}) at s3://{}/{}: {}", model_name, version, self.bucket, onnx_key, e)
+            format!(
+                "failed to fetch model.onnx for model '{}' (version {}) at s3://{}/{}: {}",
+                model_name, version, self.bucket, onnx_key, e
+            )
         })?;
 
         // Write to local cache
@@ -221,11 +231,7 @@ impl LocalModelRepository {
 
         let model_path = version_dir.join("model.onnx");
         if !model_path.exists() {
-            return Err(format!(
-                "model.onnx not found at {}",
-                model_path.display()
-            )
-            .into());
+            return Err(format!("model.onnx not found at {}", model_path.display()).into());
         }
 
         Ok(LoadedModel {

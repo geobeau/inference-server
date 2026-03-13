@@ -7,12 +7,12 @@ mod model_runtime;
 mod scheduler;
 mod tensor;
 mod tracing;
+use ::tracing::info;
 use arc_swap::ArcSwap;
 use clap::Parser;
 use pajamax::{serve, Server};
-use ::tracing::info;
-use tracing_subscriber::EnvFilter;
 use std::{collections::HashMap, sync::Arc};
+use tracing_subscriber::EnvFilter;
 
 use ort::{environment::GlobalThreadPoolOptions, execution_providers::CUDAExecutionProvider};
 
@@ -42,20 +42,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let discovered: Vec<LoadedModel> = match model_source {
         cli::ModelSource::Local(path) => {
             let repo = LocalModelRepository::new(path);
-            repo.load_all().expect("failed to load models from local directory")
+            repo.load_all()
+                .expect("failed to load models from local directory")
         }
-        cli::ModelSource::S3 { endpoint, bucket, prefix, region, cache_dir } => {
+        cli::ModelSource::S3 {
+            endpoint,
+            bucket,
+            prefix,
+            region,
+            cache_dir,
+        } => {
             let repo = ModelRepository::new(&endpoint, &bucket, &prefix, &region, cache_dir);
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .unwrap();
-            rt.block_on(repo.load_all()).expect("failed to load models from S3")
+            rt.block_on(repo.load_all())
+                .expect("failed to load models from S3")
         }
     };
     let discovered: Vec<LoadedModel> = if let Some(ref filter) = args.load_models {
         let allowed: std::collections::HashSet<&str> = filter.iter().map(|s| s.as_str()).collect();
-        discovered.into_iter().filter(|m| allowed.contains(m.name.as_str())).collect()
+        discovered
+            .into_iter()
+            .filter(|m| allowed.contains(m.name.as_str()))
+            .collect()
     } else {
         discovered
     };
@@ -144,7 +155,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut proactor = compio::driver::ProactorBuilder::new();
                 // configs taken from apache iggy
                 proactor
-                    .capacity(4096)
+                    .capacity(8096)
                     .coop_taskrun(true)
                     .taskrun_flag(true);
 

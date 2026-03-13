@@ -24,9 +24,7 @@ pub struct TritonService {
 }
 
 impl TritonService {
-    pub fn new(
-        model_map: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
-    ) -> Self {
+    pub fn new(model_map: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>) -> Self {
         TritonService {
             loaded_models: model_map,
         }
@@ -143,7 +141,10 @@ impl GrpcInferenceService for TritonService {
                     if *req_dim <= 0 {
                         return Err(Status {
                             code: Code::InvalidArgument,
-                            message: format!("Input '{}' batch size must be positive, got {}", req_input.name, req_dim),
+                            message: format!(
+                                "Input '{}' batch size must be positive, got {}",
+                                req_input.name, req_dim
+                            ),
                         });
                     }
                 } else if *req_dim != *model_dim {
@@ -189,14 +190,12 @@ impl GrpcInferenceService for TritonService {
         let outputs = output_metadata
             .iter()
             .zip(proxy.model_metadata.output_meta.iter())
-            .map(|((data_type, shape), meta)| {
-                InferOutputTensor {
-                    name: meta.name.clone(),
-                    datatype: DataType::from(*data_type).as_str_name().to_string(),
-                    shape: Vec::from(shape.deref()),
-                    parameters: HashMap::new(),
-                    contents: None,
-                }
+            .map(|((data_type, shape), meta)| InferOutputTensor {
+                name: meta.name.clone(),
+                datatype: DataType::from(*data_type).as_str_name().to_string(),
+                shape: Vec::from(shape.deref()),
+                parameters: HashMap::new(),
+                contents: None,
             })
             .collect();
         trace.record_output_processed();

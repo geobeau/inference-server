@@ -65,7 +65,7 @@ pub struct Args {
     pub max_concurrent_streams: usize,
 
     /// Maximum HTTP/2 frame size in bytes (max 16777215).
-    #[arg(long, default_value_t = 16 * 1024 * 1024 - 1)]
+    #[arg(long, default_value_t = 32 * 1024)]
     pub max_frame_size: usize,
 }
 
@@ -84,8 +84,7 @@ impl Args {
     pub fn model_source(&self) -> ModelSource {
         if let Some(ref path) = self.model_repository {
             ModelSource::Local(path.clone())
-        } else if let (Some(ref endpoint), Some(ref bucket)) =
-            (&self.s3_endpoint, &self.s3_bucket)
+        } else if let (Some(ref endpoint), Some(ref bucket)) = (&self.s3_endpoint, &self.s3_bucket)
         {
             ModelSource::S3 {
                 endpoint: endpoint.clone(),
@@ -95,7 +94,9 @@ impl Args {
                 cache_dir: self.model_cache_dir.clone(),
             }
         } else {
-            eprintln!("error: either --model-repository or --s3-bucket + --s3-endpoint is required");
+            eprintln!(
+                "error: either --model-repository or --s3-bucket + --s3-endpoint is required"
+            );
             std::process::exit(1);
         }
     }

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 use arc_swap::ArcSwap;
 use ort::memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType};
@@ -71,6 +72,39 @@ impl ModelRuntimeManager {
         }
     }
 
+    fn spawn_supertensor_metrics_reporter(
+        metrics: Arc<MetricsRegistry>,
+        model_name: String,
+        model_proxy: Arc<ModelProxy>,
+    ) {
+        compio::runtime::spawn(async move {
+            let executors_in_use = metrics
+                .inference_executors_in_use
+                .with_label_values(&[model_name.as_str()]);
+            let ring_tail_index = metrics
+                .inference_ring_tail_index
+                .with_label_values(&[model_name.as_str()]);
+            let ring_in_use_index = metrics
+                .inference_ring_in_use_index
+                .with_label_values(&[model_name.as_str()]);
+            let ring_head_index = metrics
+                .inference_ring_head_index
+                .with_label_values(&[model_name.as_str()]);
+            let to_i64 = |value: usize| i64::try_from(value).unwrap_or(i64::MAX);
+
+            loop {
+                let snapshot = model_proxy.data.metrics_snapshot();
+                executors_in_use.set(to_i64(snapshot.executors_in_use));
+                ring_tail_index.set(to_i64(snapshot.tail_index));
+                ring_in_use_index.set(to_i64(snapshot.in_use_index));
+                ring_head_index.set(to_i64(snapshot.head_index));
+
+                compio::time::sleep(Duration::from_secs(1)).await;
+            }
+        })
+        .detach();
+    }
+
     async fn load_model(
         &self,
         model_name: String,
@@ -134,7 +168,7 @@ impl ModelRuntimeManager {
             .iter()
             .map(|input| {
                 let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
-                
+
                 // Get the base shape from the model
                 let mut tensor_shape: Vec<i64> = input
                     .dtype()
@@ -143,7 +177,7 @@ impl ModelRuntimeManager {
                     .iter()
                     .cloned()
                     .collect();
-                
+
                 // Apply shape override if specified for this input
                 if let Some(override_shape) = config.input_shapes.get(input.name()) {
                     // Merge override shape with model shape
@@ -155,7 +189,7 @@ impl ModelRuntimeManager {
                         }
                     }
                 }
-                
+
                 ModelInput {
                     name: input.name().to_string(),
                     data_type: (*tensor_type).into(),
@@ -175,7 +209,7 @@ impl ModelRuntimeManager {
             .iter()
             .map(|output| {
                 let tensor_type: &DataType = &output.dtype().tensor_type().unwrap().into();
-                
+
                 // Get the base shape from the model
                 let mut tensor_shape: Vec<i64> = output
                     .dtype()
@@ -184,7 +218,7 @@ impl ModelRuntimeManager {
                     .iter()
                     .cloned()
                     .collect();
-                
+
                 // Apply shape override if specified for this output
                 if let Some(override_shape) = config.output_shapes.get(output.name()) {
                     // Merge override shape with model shape
@@ -194,7 +228,7 @@ impl ModelRuntimeManager {
                         }
                     }
                 }
-                
+
                 ModelOutput {
                     name: output.name().to_string(),
                     data_type: (*tensor_type).into(),
@@ -214,7 +248,7 @@ impl ModelRuntimeManager {
             .enumerate()
             .map(|(i, input)| {
                 let tensor_type: &DataType = &input.dtype().tensor_type().unwrap().into();
-                
+
                 // Get the base shape from the model
                 let mut tensor_shape: Vec<i64> = input
                     .dtype()
@@ -223,7 +257,7 @@ impl ModelRuntimeManager {
                     .iter()
                     .cloned()
                     .collect();
-                
+
                 // Apply shape override if specified for this input
                 if let Some(override_shape) = config.input_shapes.get(input.name()) {
                     // Merge override shape with model shape
@@ -233,7 +267,7 @@ impl ModelRuntimeManager {
                         }
                     }
                 }
-                
+
                 let mut input_shape = tensor_shape.clone();
                 input_shape[0] = 1;
                 let input_metadata = ModelInputMetadata {
@@ -254,7 +288,7 @@ impl ModelRuntimeManager {
             .iter()
             .map(|output| {
                 let tensor_type: &DataType = &output.dtype().tensor_type().unwrap().into();
-                
+
                 // Get the base shape from the model
                 let mut tensor_shape: Vec<i64> = output
                     .dtype()
@@ -263,7 +297,7 @@ impl ModelRuntimeManager {
                     .iter()
                     .cloned()
                     .collect();
-                
+
                 // Apply shape override if specified for this output
                 if let Some(override_shape) = config.output_shapes.get(output.name()) {
                     // Merge override shape with model shape
@@ -273,7 +307,7 @@ impl ModelRuntimeManager {
                         }
                     }
                 }
-                
+
                 TensorMetadata {
                     name: output.name().to_string(),
                     datatype: tensor_type.to_metadata_string(),
@@ -319,6 +353,7 @@ impl ModelRuntimeManager {
             model_config,
             model_metadata,
         });
+        let metrics_model_name = model_name.clone();
 
         // Register in the shared model map
         let current = self.loaded_models.load();
@@ -326,6 +361,11 @@ impl ModelRuntimeManager {
         new_map.insert(model_name, model_proxy.clone());
         self.loaded_models.store(Arc::new(new_map));
         self.metrics.loaded_models.inc();
+        Self::spawn_supertensor_metrics_reporter(
+            self.metrics.clone(),
+            metrics_model_name,
+            model_proxy.clone(),
+        );
 
         // Dispatch sessions round-robin to session starters
         for (i, session) in sessions.into_iter().enumerate() {

@@ -17,9 +17,9 @@ use ort::{
     value::{Outlet, Shape, TensorElementType, Value},
 };
 use smallvec::SmallVec;
-use tracing::info;
 use std::time::Instant;
 use tokio::sync::{futures::Notified, Notify};
+use tracing::info;
 
 use crate::{
     tensor::batched_tensor::{value_as_byte_slice, BatchableTensor, TensorBytes},
@@ -27,6 +27,30 @@ use crate::{
 };
 
 const HALF_RANGE: usize = usize::MAX / 2;
+
+struct ExecutorsInUseGuard<'a> {
+    executors_in_use: &'a AtomicUsize,
+}
+
+impl<'a> ExecutorsInUseGuard<'a> {
+    fn new(executors_in_use: &'a AtomicUsize) -> Self {
+        executors_in_use.fetch_add(1, Ordering::AcqRel);
+        Self { executors_in_use }
+    }
+}
+
+impl Drop for ExecutorsInUseGuard<'_> {
+    fn drop(&mut self) {
+        self.executors_in_use.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+pub struct SuperTensorMetricsSnapshot {
+    pub tail_index: usize,
+    pub in_use_index: usize,
+    pub head_index: usize,
+    pub executors_in_use: usize,
+}
 
 struct DataTracker {
     // Dirty buffer should not be reused
@@ -225,6 +249,7 @@ pub struct SuperTensorBuffer {
     head: PaddedAtomic,
     executor_head: PaddedAtomic,
     tail: PaddedAtomic,
+    executors_in_use: AtomicUsize,
     // The mask is used for efficient modulo arithmetic to wrap around the ring buffer.
     // The Problem:
     // When you have a ring buffer with n buffers, you need to convert a continuously incrementing index (0, 1, 2, 3, 4, 5...) into a buffer position (0, 1, 2, 3, 0, 1, 2, 3...).
@@ -290,21 +315,25 @@ impl SuperTensorBuffer {
                     };
 
                     // Apply shape override if specified for this input
-                    let effective_shape = if let Some(override_shape) = shape_overrides.get(input.name()) {
-                        // Create a new shape with overridden dimensions (except dim 0 which is batch)
-                        let mut new_shape = shape.clone();
-                        for (i, override_dim) in override_shape.iter().enumerate() {
-                            if i > 0 && i < new_shape.len() {
-                                new_shape[i] = *override_dim;
+                    let effective_shape =
+                        if let Some(override_shape) = shape_overrides.get(input.name()) {
+                            // Create a new shape with overridden dimensions (except dim 0 which is batch)
+                            let mut new_shape = shape.clone();
+                            for (i, override_dim) in override_shape.iter().enumerate() {
+                                if i > 0 && i < new_shape.len() {
+                                    new_shape[i] = *override_dim;
+                                }
                             }
-                        }
-                        new_shape
-                    } else {
-                        shape.clone()
-                    };
+                            new_shape
+                        } else {
+                            shape.clone()
+                        };
 
                     batched_input_tensors.push(UnsafeCell::from(BatchableTensor::new(
-                        *ty, &effective_shape, batch_size, allocator,
+                        *ty,
+                        &effective_shape,
+                        batch_size,
+                        allocator,
                     )));
                 });
                 input_tensors.push(batched_input_tensors);
@@ -346,6 +375,7 @@ impl SuperTensorBuffer {
                     batch_mask,
                     batch_size,
                 },
+                executors_in_use: AtomicUsize::new(0),
                 capacity,
                 ring_mask,
                 batch_mask,
@@ -534,10 +564,23 @@ impl SuperTensorBuffer {
         }
 
         self.seal_current_batch(tracker, &current_executor_idx);
+        let _executors_in_use_guard = ExecutorsInUseGuard::new(&self.executors_in_use);
         self.execute_current_batch(f, tracker, &current_executor_idx)
             .await;
         self.reset_batch(tracker);
         self.move_tail_to_next_non_dirty_buffer();
+    }
+
+    pub fn metrics_snapshot(&self) -> SuperTensorMetricsSnapshot {
+        SuperTensorMetricsSnapshot {
+            tail_index: self.tail.load(Ordering::Acquire).as_absolute_index(),
+            in_use_index: self
+                .executor_head
+                .load(Ordering::Acquire)
+                .as_absolute_index(),
+            head_index: self.head.load(Ordering::Acquire).as_absolute_index(),
+            executors_in_use: self.executors_in_use.load(Ordering::Acquire),
+        }
     }
 
     async fn execute_current_batch<F>(
@@ -608,9 +651,11 @@ impl SuperTensorBuffer {
             let mut all_inputs = SmallVec::new();
             let batch_id = current_executor_idx.as_batch_id();
 
-            self.input_tensors[batch_id].iter().for_each(|batch_tensors| {
-                all_inputs.push((*batch_tensors.get()).inner_tensor.view().into());
-            });
+            self.input_tensors[batch_id]
+                .iter()
+                .for_each(|batch_tensors| {
+                    all_inputs.push((*batch_tensors.get()).inner_tensor.view().into());
+                });
             all_inputs
         }
     }
