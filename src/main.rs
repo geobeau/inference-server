@@ -95,13 +95,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         starter_rxs.push(Some(rx));
     }
 
-    let addr = "0.0.0.0:8001";
+    let addr = &args.grpc_addr;
     info!("Starting Triton gRPC server on {}", addr);
 
     let config = pajamax::Config::new()
-        .max_concurrent_connections(100000)
-        .max_concurrent_streams(100000)
-        .max_frame_size(16 * 1024 * 1024);
+        .max_concurrent_connections(args.max_concurrent_connections)
+        .max_concurrent_streams(args.max_concurrent_streams)
+        .max_frame_size(args.max_frame_size);
 
     let grpc_loaded_models = loaded_models.clone();
     let services: Vec<Box<dyn Fn() -> std::rc::Rc<dyn pajamax::PajamaxService> + Send + Sync>> =

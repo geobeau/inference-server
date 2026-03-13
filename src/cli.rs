@@ -50,6 +50,23 @@ pub struct Args {
     /// If omitted, all discovered models are loaded.
     #[arg(long, value_delimiter = ',')]
     pub load_models: Option<Vec<String>>,
+
+    // ── gRPC / HTTP/2 server ─────────────────────────────────
+    /// gRPC listen address.
+    #[arg(long, default_value = "0.0.0.0:8001")]
+    pub grpc_addr: String,
+
+    /// Maximum concurrent HTTP/2 connections.
+    #[arg(long, default_value_t = 100_000)]
+    pub max_concurrent_connections: usize,
+
+    /// Maximum concurrent HTTP/2 streams per connection.
+    #[arg(long, default_value_t = 100_000)]
+    pub max_concurrent_streams: usize,
+
+    /// Maximum HTTP/2 frame size in bytes (max 16777215).
+    #[arg(long, default_value_t = 16 * 1024 * 1024 - 1)]
+    pub max_frame_size: usize,
 }
 
 pub enum ModelSource {
