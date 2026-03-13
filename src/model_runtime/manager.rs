@@ -157,12 +157,6 @@ impl ModelRuntimeManager {
         )
         .map_err(|_| LoadError::SuperTensorBuild)?;
 
-        let metadata_name = first_session
-            .metadata()
-            .map_err(|e| LoadError::SessionBuild(e.to_string()))?
-            .name()
-            .unwrap_or(model_name.clone());
-
         let inputs = first_session
             .inputs()
             .iter()
@@ -323,7 +317,7 @@ impl ModelRuntimeManager {
         };
 
         let model_config = ModelConfig {
-            name: metadata_name,
+            name: model_name.clone(),
             platform: String::from("onnxruntime_onnx"),
             backend: String::from("onnxruntime"),
             runtime: String::from("onnxruntime"),
