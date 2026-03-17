@@ -14,7 +14,7 @@ use pajamax::{serve, Server};
 use std::{collections::HashMap, sync::Arc};
 use tracing_subscriber::EnvFilter;
 
-use ort::{environment::GlobalThreadPoolOptions, execution_providers::CUDAExecutionProvider};
+use ort::{environment::GlobalThreadPoolOptions, execution_providers::{CUDAExecutionProvider, ExecutionProviderDispatch, TensorRTExecutionProvider}};
 
 use crate::{
     grpc::{inference::GrpcInferenceServiceServer, TritonService},
@@ -71,10 +71,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         discovered
     };
 
-    let cuda_provider = CUDAExecutionProvider::default()
-        .with_device_id(0)
-        .build()
-        .error_on_failure();
+    let providers: Vec<ExecutionProviderDispatch> = args
+        .execution_providers
+        .iter()
+        .map(|ep| match ep {
+            cli::ExecutionProviderKind::Cpu => {
+                info!("Registering CPU execution provider");
+                ort::execution_providers::CPUExecutionProvider::default()
+                    .build()
+            }
+            cli::ExecutionProviderKind::Cuda => {
+                info!("Registering CUDA execution provider");
+                CUDAExecutionProvider::default()
+                    .with_device_id(0)
+                    .build()
+                    .error_on_failure()
+            }
+            cli::ExecutionProviderKind::TensorRT => {
+                info!("Registering TensorRT execution provider");
+                TensorRTExecutionProvider::default()
+                    .with_device_id(0)
+                    .build()
+                    .error_on_failure()
+            }
+        })
+        .collect();
     let thread_pool = GlobalThreadPoolOptions::default()
         .with_intra_threads(args.ort_intra_threads)
         .unwrap()
@@ -83,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_spin_control(false)
         .unwrap();
     ort::init()
-        .with_execution_providers([cuda_provider])
+        .with_execution_providers(providers)
         .with_global_thread_pool(thread_pool)
         .commit();
 

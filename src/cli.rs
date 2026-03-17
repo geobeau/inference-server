@@ -2,6 +2,38 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ExecutionProviderKind {
+    Cpu,
+    Cuda,
+    TensorRT,
+}
+
+impl std::str::FromStr for ExecutionProviderKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "cpu" => Ok(Self::Cpu),
+            "cuda" => Ok(Self::Cuda),
+            "tensorrt" | "trt" => Ok(Self::TensorRT),
+            other => Err(format!(
+                "unknown execution provider '{other}'; expected one of: cpu, cuda, tensorrt (or trt)"
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for ExecutionProviderKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Cpu => write!(f, "cpu"),
+            Self::Cuda => write!(f, "cuda"),
+            Self::TensorRT => write!(f, "tensorrt"),
+        }
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "inference-server")]
 pub struct Args {
@@ -50,6 +82,13 @@ pub struct Args {
     /// If omitted, all discovered models are loaded.
     #[arg(long, value_delimiter = ',')]
     pub load_models: Option<Vec<String>>,
+
+    // ── Execution providers ────────────────────────────────────
+    /// Comma-separated list of execution providers in priority order.
+    /// Supported: cpu, cuda, tensorrt (or trt).
+    /// Defaults to "tensorrt".
+    #[arg(long, value_delimiter = ',', default_values_t = vec![ExecutionProviderKind::TensorRT])]
+    pub execution_providers: Vec<ExecutionProviderKind>,
 
     // ── gRPC / HTTP/2 server ─────────────────────────────────
     /// gRPC listen address.
