@@ -509,7 +509,7 @@ impl SuperTensorBuffer {
         reservation
     }
 
-    pub async fn execute_on_batch<F>(&self, _id: String, f: F)
+    pub async fn execute_on_batch<F>(&self, _id: String, f: F) -> usize
     where
         F: AsyncFnOnce(&[SessionInputValue]) -> SessionValues,
     {
@@ -564,11 +564,13 @@ impl SuperTensorBuffer {
         }
 
         self.seal_current_batch(tracker, &current_executor_idx);
+        let batch_items = tracker.written_slots.load(Ordering::Acquire);
         let _executors_in_use_guard = ExecutorsInUseGuard::new(&self.executors_in_use);
         self.execute_current_batch(f, tracker, &current_executor_idx)
             .await;
         self.reset_batch(tracker);
         self.move_tail_to_next_non_dirty_buffer();
+        batch_items
     }
 
     pub fn metrics_snapshot(&self) -> SuperTensorMetricsSnapshot {

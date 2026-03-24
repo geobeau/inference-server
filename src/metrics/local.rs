@@ -38,6 +38,7 @@ struct LocalModelMetrics {
     requests_ok: LocalIntCounter,
     requests_not_found: LocalIntCounter,
     request_duration: LocalHistogram,
+    batch_items: LocalHistogram,
     model_execution: LocalHistogram,
     model_proxy_aquired: LocalHistogram,
     serialization_done: LocalHistogram,
@@ -75,6 +76,10 @@ impl LocalMetrics {
                         .local(),
                     request_duration: r
                         .inference_request_duration_seconds
+                        .with_label_values(&[model])
+                        .local(),
+                    batch_items: r
+                        .inference_batch_items
                         .with_label_values(&[model])
                         .local(),
                     model_execution: r
@@ -126,6 +131,11 @@ impl LocalMetrics {
             .observe(duration);
     }
 
+    pub fn observe_batch_items(&self, model: &str, count: f64) {
+        self.ensure_model(model);
+        self.per_model.borrow()[model].batch_items.observe(count);
+    }
+
     pub fn observe_model_execution(&self, model: &str, duration: f64) {
         self.ensure_model(model);
         self.per_model.borrow()[model]
@@ -159,6 +169,7 @@ impl LocalMetrics {
             m.requests_ok.flush();
             m.requests_not_found.flush();
             m.request_duration.flush();
+            m.batch_items.flush();
             m.model_execution.flush();
             m.model_proxy_aquired.flush();
             m.serialization_done.flush();

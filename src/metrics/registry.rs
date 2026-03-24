@@ -8,6 +8,7 @@ pub struct MetricsRegistry {
 
     pub inference_requests_total: IntCounterVec,
     pub inference_batches_total: IntCounterVec,
+    pub inference_batch_items: HistogramVec,
 
     pub inference_request_duration_seconds: HistogramVec,
     pub inference_batch_duration_seconds: HistogramVec,
@@ -57,6 +58,19 @@ impl MetricsRegistry {
         .unwrap();
         registry
             .register(Box::new(inference_batches_total.clone()))
+            .unwrap();
+
+        let inference_batch_items = HistogramVec::new(
+            HistogramOpts::new(
+                "inference_batch_items",
+                "Number of items in a batch before execution",
+            )
+            .buckets(exponential_buckets(1.0, 2.0, 12).unwrap()),
+            &["model"],
+        )
+        .unwrap();
+        registry
+            .register(Box::new(inference_batch_items.clone()))
             .unwrap();
 
         let inference_request_duration_seconds = HistogramVec::new(
@@ -220,6 +234,7 @@ impl MetricsRegistry {
             registry,
             inference_requests_total,
             inference_batches_total,
+            inference_batch_items,
             inference_request_duration_seconds,
             inference_batch_duration_seconds,
             inference_model_execution_seconds,

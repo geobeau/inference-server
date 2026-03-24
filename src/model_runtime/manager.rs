@@ -125,8 +125,8 @@ impl ModelRuntimeManager {
             let mut builder = Session::builder()
                 .map_err(|e| LoadError::SessionBuild(e.to_string()))?
                 .with_optimization_level(GraphOptimizationLevel::Level3)
-                .map_err(|e| LoadError::SessionBuild(e.to_string()))?
-                .with_profiling("ort_profile")
+                // .map_err(|e| LoadError::SessionBuild(e.to_string()))?
+                // .with_profiling("ort_profile")
                 .map_err(|e| LoadError::SessionBuild(e.to_string()))?;
 
             for lib_path in &self.custom_op_libraries {

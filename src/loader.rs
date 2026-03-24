@@ -19,10 +19,10 @@ impl OnnxExecutor {
     pub async fn run(&mut self) {
         info!(id = %self.id, "executor started");
         let model_name = self.model.model_config.name.clone();
-
+        let mut i = 0;
         loop {
             // println!("trying to execute another batch");
-            self.model
+            let batch_items = self.model
                 .data
                 .execute_on_batch(self.id.clone(), async |inputs| {
                     let start = std::time::Instant::now();
@@ -44,6 +44,13 @@ impl OnnxExecutor {
                     SessionValues { values }
                 })
                 .await;
+            with_local_metrics(|m| {
+                m.observe_batch_items(&model_name, batch_items as f64);
+            });
+            i = i+1;
+            // if i == 1000 {
+            //     self.session.end_profiling().unwrap();
+            // }
             // println!("executed batch")
         }
     }
