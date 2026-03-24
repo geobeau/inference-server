@@ -90,6 +90,16 @@ pub struct Args {
     #[arg(long, value_delimiter = ',', default_values_t = vec![ExecutionProviderKind::TensorRT])]
     pub execution_providers: Vec<ExecutionProviderKind>,
 
+    /// Comma-separated list of op types to exclude from TensorRT execution.
+    /// These ops will fall back to CPU instead.
+    /// Example: --trt-op-types-to-exclude LabelEncoder,Imputer,Cast
+    #[arg(long, value_delimiter = ',')]
+    pub trt_op_types_to_exclude: Option<Vec<String>>,
+
+    /// Minimum number of nodes in a subgraph for TensorRT partitioning.
+    #[arg(long)]
+    pub trt_min_subgraph_size: Option<usize>,
+
     // ── gRPC / HTTP/2 server ─────────────────────────────────
     /// gRPC listen address.
     #[arg(long, default_value = "0.0.0.0:8001")]

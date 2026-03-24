@@ -14,7 +14,7 @@ use pajamax::{serve, Server};
 use std::{collections::HashMap, sync::Arc};
 use tracing_subscriber::EnvFilter;
 
-use ort::{environment::GlobalThreadPoolOptions, execution_providers::{CUDAExecutionProvider, ExecutionProviderDispatch, TensorRTExecutionProvider}};
+use ort::{environment::GlobalThreadPoolOptions, execution_providers::{ArbitrarilyConfigurableExecutionProvider, CUDAExecutionProvider, ExecutionProviderDispatch, TensorRTExecutionProvider}};
 
 use crate::{
     grpc::{inference::GrpcInferenceServiceServer, TritonService},
@@ -89,9 +89,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             cli::ExecutionProviderKind::TensorRT => {
                 info!("Registering TensorRT execution provider");
-                TensorRTExecutionProvider::default()
-                    .with_device_id(0)
-                    .build()
+                let mut ep = TensorRTExecutionProvider::default()
+                    .with_device_id(0);
+                if let Some(min_subgraph_size) = args.trt_min_subgraph_size {
+                    ep = ep.with_arbitrary_config(
+                        "trt_min_subgraph_size",
+                        min_subgraph_size.to_string(),
+                    );
+                }
+                if let Some(ref exclude) = args.trt_op_types_to_exclude {
+                    ep = ep.with_arbitrary_config("trt_op_types_to_exclude", exclude.join(","));
+                }
+                ep.build()
                     .error_on_failure()
             }
         })
