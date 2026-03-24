@@ -90,6 +90,10 @@ pub struct Args {
     #[arg(long, value_delimiter = ',', default_values_t = vec![ExecutionProviderKind::TensorRT])]
     pub execution_providers: Vec<ExecutionProviderKind>,
 
+    /// Paths to custom operator shared libraries (.so) to register.
+    #[arg(long, value_delimiter = ',')]
+    pub custom_op_libraries: Option<Vec<PathBuf>>,
+
     /// Comma-separated list of op types to exclude from TensorRT execution.
     /// These ops will fall back to CPU instead.
     /// Example: --trt-op-types-to-exclude LabelEncoder,Imputer,Cast

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -45,6 +45,7 @@ pub struct ModelRuntimeManager {
     loaded_models: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
     metrics: Arc<MetricsRegistry>,
     round_robin: AtomicUsize,
+    custom_op_libraries: Vec<PathBuf>,
 }
 
 impl ModelRuntimeManager {
@@ -53,6 +54,7 @@ impl ModelRuntimeManager {
         starters: Vec<mpsc::Sender<SessionStartRequest>>,
         loaded_models: Arc<ArcSwap<HashMap<String, Arc<ModelProxy>>>>,
         metrics: Arc<MetricsRegistry>,
+        custom_op_libraries: Vec<PathBuf>,
     ) -> Self {
         Self {
             receiver,
@@ -60,6 +62,7 @@ impl ModelRuntimeManager {
             loaded_models,
             metrics,
             round_robin: AtomicUsize::new(0),
+            custom_op_libraries,
         }
     }
 
@@ -119,10 +122,21 @@ impl ModelRuntimeManager {
         // Build N sessions
         let mut sessions = Vec::with_capacity(num_executors);
         for _ in 0..num_executors {
-            let session = Session::builder()
+            let mut builder = Session::builder()
                 .map_err(|e| LoadError::SessionBuild(e.to_string()))?
                 .with_optimization_level(GraphOptimizationLevel::Level3)
                 .map_err(|e| LoadError::SessionBuild(e.to_string()))?
+                .with_profiling("ort_profile")
+                .map_err(|e| LoadError::SessionBuild(e.to_string()))?;
+
+            for lib_path in &self.custom_op_libraries {
+                info!(?lib_path, "Registering custom op library");
+                builder = builder
+                    .with_operator_library(lib_path)
+                    .map_err(|e| LoadError::SessionBuild(e.to_string()))?;
+            }
+
+            let session = builder
                 .commit_from_file(&model_path)
                 .map_err(|e| LoadError::SessionBuild(e.to_string()))?;
             sessions.push(session);
@@ -355,6 +369,10 @@ impl ModelRuntimeManager {
         new_map.insert(model_name, model_proxy.clone());
         self.loaded_models.store(Arc::new(new_map));
         self.metrics.loaded_models.inc();
+        self.metrics
+            .inference_configured_batch_size
+            .with_label_values(&[&metrics_model_name])
+            .set(batch_size as i64);
         Self::spawn_supertensor_metrics_reporter(
             self.metrics.clone(),
             metrics_model_name,

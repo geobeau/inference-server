@@ -23,6 +23,7 @@ pub struct MetricsRegistry {
     pub inference_ring_tail_index: IntGaugeVec,
     pub inference_ring_in_use_index: IntGaugeVec,
     pub inference_ring_head_index: IntGaugeVec,
+    pub inference_configured_batch_size: IntGaugeVec,
     pub loaded_models: IntGauge,
 }
 
@@ -199,6 +200,18 @@ impl MetricsRegistry {
             .register(Box::new(inference_ring_head_index.clone()))
             .unwrap();
 
+        let inference_configured_batch_size = IntGaugeVec::new(
+            Opts::new(
+                "inference_configured_batch_size",
+                "Configured batch size per model",
+            ),
+            &["model"],
+        )
+        .unwrap();
+        registry
+            .register(Box::new(inference_configured_batch_size.clone()))
+            .unwrap();
+
         let loaded_models =
             IntGauge::new("loaded_models", "Number of currently loaded models").unwrap();
         registry.register(Box::new(loaded_models.clone())).unwrap();
@@ -219,6 +232,7 @@ impl MetricsRegistry {
             inference_ring_tail_index,
             inference_ring_in_use_index,
             inference_ring_head_index,
+            inference_configured_batch_size,
             loaded_models,
         }
     }

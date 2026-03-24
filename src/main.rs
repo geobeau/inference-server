@@ -154,11 +154,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let grpc_server = Server::new(services, config, addr.to_string());
 
     // Build the ModelRuntimeManager (will be moved into core-0)
+    let custom_op_libraries = args.custom_op_libraries.unwrap_or_default();
     let mut maybe_manager = Some(ModelRuntimeManager::new(
         load_rx,
         starter_txs,
         loaded_models,
         metrics_registry.clone(),
+        custom_op_libraries,
     ));
 
     let mut handles = Vec::new();
