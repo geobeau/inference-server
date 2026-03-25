@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -366,7 +366,7 @@ impl ModelRuntimeManager {
         // Register in the shared model map
         let current = self.loaded_models.load();
         let mut new_map = (**current).clone();
-        new_map.insert(model_name, model_proxy.clone());
+        new_map.insert(model_name.clone(), model_proxy.clone());
         self.loaded_models.store(Arc::new(new_map));
         self.metrics.loaded_models.inc();
         self.metrics
@@ -379,12 +379,12 @@ impl ModelRuntimeManager {
             model_proxy.clone(),
         );
 
-        // Dispatch sessions round-robin to session starters
+        // Dispatch sessions round-robin to executor cores
         for (i, session) in sessions.into_iter().enumerate() {
             let idx = self.round_robin.fetch_add(1, Ordering::Relaxed) % self.starters.len();
             self.starters[idx]
                 .send(SessionStartRequest {
-                    executor_id: format!("executor-{i}"),
+                    executor_id: format!("{}-executor-{i}", &model_name),
                     session,
                     model_proxy: model_proxy.clone(),
                 })

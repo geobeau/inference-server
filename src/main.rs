@@ -33,7 +33,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let args = cli::Args::parse();
-    let num_cores = args.num_cores;
+    let processing_cores = args.processing_cores;
+    let executor_cores = args.executor_cores;
 
     // Validate CLI early so we fail fast before starting gRPC / workers
     let model_source = args.model_source();
@@ -127,15 +128,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the load-model channel
     let (load_tx, load_rx) = tokio::sync::mpsc::channel::<LoadModelRequest>(16);
 
-    // Create per-core session starter channels
-    let mut starter_txs = Vec::with_capacity(num_cores);
-    let mut starter_rxs = Vec::with_capacity(num_cores);
-    for _ in 0..num_cores {
-        let (tx, rx) = tokio::sync::mpsc::channel(64);
-        starter_txs.push(tx);
-        starter_rxs.push(Some(rx));
-    }
-
     let addr = &args.grpc_addr;
     info!("Starting Triton gRPC server on {}", addr);
 
@@ -153,28 +145,78 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })];
     let grpc_server = Server::new(services, config, addr.to_string());
 
-    // Build the ModelRuntimeManager (will be moved into core-0)
+    // Create per-executor-core session starter channels
+    let mut starter_txs = Vec::with_capacity(executor_cores);
+    let mut starter_rxs = Vec::with_capacity(executor_cores);
+    for _ in 0..executor_cores {
+        let (tx, rx) = tokio::sync::mpsc::channel(64);
+        starter_txs.push(tx);
+        starter_rxs.push(Some(rx));
+    }
+
+    // Spawn the ModelRuntimeManager on its own dedicated thread
     let custom_op_libraries = args.custom_op_libraries.unwrap_or_default();
-    let mut maybe_manager = Some(ModelRuntimeManager::new(
+    let manager_metrics = metrics_registry.clone();
+    let manager = ModelRuntimeManager::new(
         load_rx,
         starter_txs,
         loaded_models,
-        metrics_registry.clone(),
+        manager_metrics.clone(),
         custom_op_libraries,
-    ));
+    );
+    let manager_handle = std::thread::Builder::new()
+        .name("model-manager".into())
+        .spawn(move || {
+            let rt = compio::runtime::RuntimeBuilder::new()
+                .build()
+                .expect("failed to build manager compio runtime");
+            rt.block_on(async move {
+                metrics::init_local_metrics(manager_metrics);
+                compio::runtime::spawn(async {
+                    loop {
+                        compio::time::sleep(std::time::Duration::from_secs(1)).await;
+                        metrics::flush_local_metrics();
+                    }
+                })
+                .detach();
+                manager.run().await;
+            });
+        })
+        .unwrap();
 
-    let mut handles = Vec::new();
+    let mut handles = vec![manager_handle];
 
-    for core_id in 0..num_cores {
-        let server = grpc_server.clone();
+    // Spawn dedicated executor core threads
+    for core_id in 0..executor_cores {
         let starter_rx = starter_rxs[core_id].take().unwrap();
+        let metrics_for_executor = metrics_registry.clone();
+
+        let handle = std::thread::Builder::new()
+            .name(format!("exec-{core_id}"))
+            .spawn(move || {
+                let rt = compio::runtime::RuntimeBuilder::new()
+                    .build()
+                    .expect("failed to build executor compio runtime");
+                rt.block_on(async move {
+                    metrics::init_local_metrics(metrics_for_executor);
+                    compio::runtime::spawn(async {
+                        loop {
+                            compio::time::sleep(std::time::Duration::from_secs(1)).await;
+                            metrics::flush_local_metrics();
+                        }
+                    })
+                    .detach();
+                    SessionStarter::new(starter_rx).run().await;
+                });
+            })
+            .unwrap();
+        handles.push(handle);
+    }
+
+    // Spawn gRPC processing core threads
+    for core_id in 0..processing_cores {
+        let server = grpc_server.clone();
         let metrics_for_worker = metrics_registry.clone();
-        // Move manager into core-0's thread only
-        let manager_for_core = if core_id == 0 {
-            maybe_manager.take()
-        } else {
-            None
-        };
         let metrics_for_core = if core_id == 0 {
             Some(metrics_registry.clone())
         } else {
@@ -182,10 +224,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let handle = std::thread::Builder::new()
-            .name(format!("core-{core_id}"))
+            .name(format!("proc-{core_id}"))
             .spawn(move || {
                 let mut proactor = compio::driver::ProactorBuilder::new();
-                // configs taken from apache iggy
                 proactor
                     .capacity(8096)
                     .coop_taskrun(true)
@@ -193,12 +234,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let rt = compio::runtime::RuntimeBuilder::new()
                     .with_proactor(proactor.to_owned())
-                    .event_interval(128)
+                    .event_interval(1024)
                     .build()
                     .expect("failed to build compio runtime");
 
                 rt.block_on(async move {
-                    // Initialize thread-local metrics and spawn periodic flush
                     metrics::init_local_metrics(metrics_for_worker);
                     compio::runtime::spawn(async {
                         loop {
@@ -208,13 +248,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     })
                     .detach();
 
-                    // Spawn the session starter for this core
-                    compio::runtime::spawn(SessionStarter::new(starter_rx).run()).detach();
-
-                    // Core-0 also runs the model runtime manager and metrics server
-                    if let Some(m) = manager_for_core {
-                        compio::runtime::spawn(m.run()).detach();
-                    }
                     if let Some(mr) = metrics_for_core {
                         compio::runtime::spawn(metrics::serve_metrics("0.0.0.0:9090", mr)).detach();
                     }
@@ -225,11 +258,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .unwrap();
         handles.push(handle);
-
-        // Break out of the loop after moving manager so the compiler knows it's consumed once
-        if core_id == 0 {
-            continue;
-        }
     }
 
     // Dispatch discovered models to the runtime manager

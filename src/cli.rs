@@ -38,10 +38,15 @@ impl std::fmt::Display for ExecutionProviderKind {
 #[command(name = "inference-server")]
 pub struct Args {
     // ── Thread pool ──────────────────────────────────────────
-    /// Number of compio worker threads (one per core).
+    /// Number of compio worker threads for gRPC processing.
     /// Defaults to the number of available CPUs.
     #[arg(long, default_value_t = default_num_cores())]
-    pub num_cores: usize,
+    pub processing_cores: usize,
+
+    /// Number of compio worker threads for model executors.
+    /// Defaults to 1.
+    #[arg(long, default_value_t = 1)]
+    pub executor_cores: usize,
 
     /// ORT intra-op thread pool size (parallelism within a single operator).
     #[arg(long, default_value_t = 5)]
