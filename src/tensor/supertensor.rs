@@ -1,5 +1,6 @@
+use atomic_refcell::AtomicRefCell;
 use std::{
-    cell::UnsafeCell,
+    cell::{OnceCell, UnsafeCell},
     cmp::min,
     collections::HashMap,
     sync::{
@@ -9,7 +10,6 @@ use std::{
     time::Duration,
 };
 
-use arc_swap::ArcSwap;
 use compio::runtime::time::sleep_until;
 use ort::{
     memory::Allocator,
@@ -18,7 +18,7 @@ use ort::{
 };
 use smallvec::SmallVec;
 use std::time::Instant;
-use tokio::sync::{futures::Notified, Notify};
+use tokio::sync::Notify;
 use tracing::info;
 
 use crate::{
@@ -52,34 +52,48 @@ pub struct SuperTensorMetricsSnapshot {
     pub executors_in_use: usize,
 }
 
+struct BatchState {
+    deadline: OnceCell<Instant>,
+    output: Arc<OnceCell<Result<SessionValues, usize>>>,
+    executor_notifier: Arc<Notify>,
+    response_ready_notifier: Arc<Notify>,
+}
+
+impl BatchState {
+    fn new() -> Self {
+        Self {
+            deadline: OnceCell::new(),
+            output: Arc::new(OnceCell::new()),
+            executor_notifier: Arc::new(Notify::new()),
+            response_ready_notifier: Arc::new(Notify::new()),
+        }
+    }
+}
+
 struct DataTracker {
     // Dirty buffer should not be reused
     dirty: AtomicUsize,
     written_slots: AtomicUsize,
-    deadline: ArcSwap<Option<Instant>>,
-    executor_notifier: ArcSwap<Notify>,
-    // TODO: make a proper error state
-    output: ArcSwap<ArcSwap<Result<SessionValues, usize>>>,
-    response_ready_notifier: Notify,
+    state: AtomicRefCell<BatchState>,
 }
 
 pub struct SessionValues {
     pub values: SmallVec<[Value; 4]>,
 }
 
-pub struct InferenceResponse<'a> {
+pub struct InferenceResponse {
     // 6 is arbitrary
-    outputs: SmallVec<[WriteReservation<'a>; 6]>,
+    outputs: SmallVec<[WriteReservation; 6]>,
 }
 
-impl<'a> InferenceResponse<'a> {
-    pub fn new() -> InferenceResponse<'a> {
+impl InferenceResponse {
+    pub fn new() -> InferenceResponse {
         InferenceResponse {
             outputs: SmallVec::new(),
         }
     }
 
-    pub fn push(&mut self, reservation: WriteReservation<'a>) {
+    pub fn push(&mut self, reservation: WriteReservation) {
         self.outputs.push(reservation);
     }
 
@@ -105,59 +119,62 @@ impl<'a> InferenceResponse<'a> {
 }
 
 // Ensure accounting when tasks are canceled
-pub struct WriteReservation<'a> {
-    tracker: &'a DataTracker,
-    output: Arc<ArcSwap<Result<SessionValues, usize>>>,
-    response_ready_notified: Notified<'a>,
+pub struct WriteReservation {
+    output: Arc<OnceCell<Result<SessionValues, usize>>>,
+    response_ready_notifier: Arc<Notify>,
     start: usize,
     end: usize,
 }
 
-impl WriteReservation<'_> {
-    fn new(tracker: &DataTracker, start: usize, end: usize) -> WriteReservation<'_> {
-        let response_ready_notified = tracker.response_ready_notifier.notified();
-        let output_arc = tracker.output.load_full().clone();
+impl WriteReservation {
+    fn new(tracker: &DataTracker, start: usize, end: usize) -> WriteReservation {
+        let state = tracker.state.borrow();
+        let output = state.output.clone();
+        let response_ready_notifier = state.response_ready_notifier.clone();
+        drop(state);
         tracker
             .written_slots
             .fetch_add(end - start, Ordering::Release);
         WriteReservation {
-            tracker,
             start,
             end,
-            output: output_arc,
-            response_ready_notified,
+            output,
+            response_ready_notifier,
         }
     }
 
     async fn get_result(self, data: &mut Vec<Vec<u8>>) -> Vec<(TensorElementType, Shape)> {
-        // IN_FLIGHT_REQ.fetch_add(1, Ordering::Relaxed);
-        self.response_ready_notified.await;
-        // let in_flight = IN_FLIGHT_REQ.fetch_sub(1, Ordering::Relaxed);
-        // println!("in flight: {}", in_flight - 1);
-        let output_ref = self.output.load();
-        let mut metadatas = Vec::new();
-        match &output_ref.as_ref() {
-            Ok(output) => {
-                // Data starts empty and get_result can be called many time, it needs initialization
-                if data.is_empty() {
-                    output.values.iter().for_each(|_| data.push(Vec::new()));
+        loop {
+            let notified = self.response_ready_notifier.notified();
+            if let Some(result) = self.output.get() {
+                let mut metadatas = Vec::new();
+                match result {
+                    Ok(output) => {
+                        if data.is_empty() {
+                            output.values.iter().for_each(|_| data.push(Vec::new()));
+                        }
+                        output
+                            .values
+                            .iter()
+                            .enumerate()
+                            .for_each(|(i, batch_tensor)| {
+                                data[i].extend_from_slice(value_as_byte_slice(
+                                    batch_tensor,
+                                    self.start,
+                                    self.end,
+                                ));
+                                metadatas.push((
+                                    *batch_tensor.data_type(),
+                                    batch_tensor.shape().clone(),
+                                ));
+                            });
+                    }
+                    Err(_) => todo!(),
                 }
-                output
-                    .values
-                    .iter()
-                    .enumerate()
-                    .for_each(|(i, batch_tensor)| {
-                        data[i].extend_from_slice(value_as_byte_slice(
-                            batch_tensor,
-                            self.start,
-                            self.end,
-                        ));
-                        metadatas.push((*batch_tensor.data_type(), batch_tensor.shape().clone()));
-                    });
+                return metadatas;
             }
-            Err(_) => todo!(),
+            notified.await;
         }
-        metadatas
     }
 }
 
@@ -344,10 +361,7 @@ impl SuperTensorBuffer {
                 trackers.push(DataTracker {
                     dirty: AtomicUsize::new(0),
                     written_slots: AtomicUsize::new(0),
-                    deadline: ArcSwap::from_pointee(None),
-                    output: ArcSwap::from(Arc::from(ArcSwap::from(Arc::from(Err(0))))),
-                    response_ready_notifier: Notify::new(),
-                    executor_notifier: ArcSwap::from(Arc::from(Notify::new())),
+                    state: AtomicRefCell::new(BatchState::new()),
                 });
             }
             let ring_mask = (capacity * batch_size) - 1;
@@ -389,7 +403,7 @@ impl SuperTensorBuffer {
         &self,
         data: &[TensorBytes<'_>],
         trace: &mut ClientTrace,
-    ) -> Result<InferenceResponse<'_>, usize> {
+    ) -> Result<InferenceResponse, usize> {
         loop {
             let mut current_head = self.head.load(Ordering::Relaxed);
             let current_tail = self.tail.load(Ordering::Acquire);
@@ -467,7 +481,7 @@ impl SuperTensorBuffer {
         data_start: usize,
         data_end: usize,
         data: &[TensorBytes<'_>],
-    ) -> WriteReservation<'_> {
+    ) -> WriteReservation {
         // batch_slot is the index of the slot within a batch
         // Used to track if it's the first or last reservation on the batch
         // println!(
@@ -494,7 +508,7 @@ impl SuperTensorBuffer {
             let deadline = Instant::now() + Duration::from_millis(2);
             tracker.dirty.store(1, Ordering::Relaxed);
             // println!("{}> writing deadline", idx.as_batch_id());
-            tracker.deadline.store(Arc::from(Some(deadline)));
+            let _ = tracker.state.borrow().deadline.set(deadline);
         }
         fence(Ordering::Release);
 
@@ -504,7 +518,7 @@ impl SuperTensorBuffer {
         // If the batch is going to be completed, awaken the executor
         if batch_slot == (self.batch_size - 1) || batch_slot == 0 {
             // println!("Notifying executor on {}", idx.as_batch_id());
-            tracker.executor_notifier.load_full().notify_one();
+            tracker.state.borrow().executor_notifier.notify_one();
         }
         reservation
     }
@@ -539,10 +553,10 @@ impl SuperTensorBuffer {
             .trackers
             .get(current_executor_idx.as_batch_id())
             .unwrap();
-        tracker.executor_notifier.load().notified().await;
+        let executor_notifier = tracker.state.borrow().executor_notifier.clone();
+        executor_notifier.notified().await;
 
-        let notifier = tracker.executor_notifier.load();
-        let notified_full = notifier.notified();
+        let notified_full = executor_notifier.notified();
         let head = self.head.load(Ordering::Acquire);
 
         // Wrapping safe: head < current_executor_idx.as_absolute_batch_higher_bound()
@@ -551,8 +565,8 @@ impl SuperTensorBuffer {
             .as_absolute_batch_higher_bound()
             .wrapping_sub(head.as_absolute_index());
         if dist_to_higher > 0 && dist_to_higher < HALF_RANGE {
-            let maybe_deadline = tracker.deadline.load_full();
-            if let Some(deadline) = *maybe_deadline {
+            let maybe_deadline = tracker.state.borrow().deadline.get().copied();
+            if let Some(deadline) = maybe_deadline {
                 let _now = Instant::now();
                 tokio::select! {
                     _ = sleep_until(deadline) => {
@@ -568,6 +582,7 @@ impl SuperTensorBuffer {
         let _executors_in_use_guard = ExecutorsInUseGuard::new(&self.executors_in_use);
         self.execute_current_batch(f, tracker, &current_executor_idx)
             .await;
+
         self.reset_batch(tracker);
         self.move_tail_to_next_non_dirty_buffer();
         batch_items
@@ -596,19 +611,17 @@ impl SuperTensorBuffer {
         let input = self.get_data_view(current_executor_idx);
         let result = f(&input).await;
         // Put the results in the arc output, to be dispatched to consumers
-        tracker.output.load_full().store(Arc::from(Ok(result)));
-        tracker.response_ready_notifier.notify_waiters();
+        let state = tracker.state.borrow();
+        let _ = state.output.set(Ok(result));
+        let notifier = state.response_ready_notifier.clone();
+        drop(state);
+        notifier.notify_waiters();
     }
 
     fn reset_batch(&self, tracker: &DataTracker) {
-        tracker.deadline.store(Arc::from(None));
-        tracker
-            .output
-            .store(Arc::from(ArcSwap::from(Arc::from(Err(0)))));
+        *tracker.state.borrow_mut() = BatchState::new();
         tracker.written_slots.store(0, Ordering::Relaxed);
         tracker.dirty.store(2, Ordering::Relaxed);
-        // executor_notifier can be called twice, recreating one avoid keeping older permits
-        tracker.executor_notifier.store(Arc::from(Notify::new()));
     }
     fn move_tail_to_next_non_dirty_buffer(&self) {
         loop {

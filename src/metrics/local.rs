@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::sync::Arc;
 
 use prometheus::local::{LocalHistogram, LocalIntCounter};
@@ -39,6 +39,7 @@ struct LocalModelMetrics {
     requests_not_found: LocalIntCounter,
     request_duration: LocalHistogram,
     batch_items: LocalHistogram,
+    client_batch_size: LocalHistogram,
     model_execution: LocalHistogram,
     model_proxy_aquired: LocalHistogram,
     serialization_done: LocalHistogram,
@@ -80,6 +81,10 @@ impl LocalMetrics {
                         .local(),
                     batch_items: r
                         .inference_batch_items
+                        .with_label_values(&[model])
+                        .local(),
+                    client_batch_size: r
+                        .inference_client_batch_size
                         .with_label_values(&[model])
                         .local(),
                     model_execution: r
@@ -136,6 +141,11 @@ impl LocalMetrics {
         self.per_model.borrow()[model].batch_items.observe(count);
     }
 
+    pub fn observe_client_batch_size(&self, model: &str, count: f64) {
+        self.ensure_model(model);
+        self.per_model.borrow()[model].client_batch_size.observe(count);
+    }
+
     pub fn observe_model_execution(&self, model: &str, duration: f64) {
         self.ensure_model(model);
         self.per_model.borrow()[model]
@@ -170,6 +180,7 @@ impl LocalMetrics {
             m.requests_not_found.flush();
             m.request_duration.flush();
             m.batch_items.flush();
+            m.client_batch_size.flush();
             m.model_execution.flush();
             m.model_proxy_aquired.flush();
             m.serialization_done.flush();

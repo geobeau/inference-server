@@ -11,7 +11,9 @@ use ::tracing::info;
 use arc_swap::ArcSwap;
 use clap::Parser;
 use pajamax::{serve, Server};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
+
+use hashbrown::HashMap;
 use tracing_subscriber::EnvFilter;
 
 use ort::{environment::GlobalThreadPoolOptions, execution_providers::{ArbitrarilyConfigurableExecutionProvider, CUDAExecutionProvider, ExecutionProviderDispatch, TensorRTExecutionProvider}};

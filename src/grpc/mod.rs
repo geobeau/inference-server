@@ -3,7 +3,9 @@ pub mod inference;
 
 use std::ops::Deref;
 use std::sync::Arc;
-use std::{collections::HashMap, vec};
+use std::vec;
+
+use hashbrown::HashMap;
 
 use arc_swap::ArcSwap;
 use inference::GrpcInferenceService;
@@ -93,6 +95,11 @@ impl GrpcInferenceService for TritonService {
         let mut trace = ClientTrace::start();
         let start = std::time::Instant::now();
         let model_name = request.model_name.clone();
+        let client_batch_size = request
+            .inputs
+            .first()
+            .and_then(|input| input.shape.first())
+            .copied();
         let models = self.loaded_models.load();
 
         let proxy: &ModelProxy = match models.get(&model_name) {
@@ -194,7 +201,7 @@ impl GrpcInferenceService for TritonService {
                 name: meta.name.clone(),
                 datatype: DataType::from(*data_type).as_str_name().to_string(),
                 shape: Vec::from(shape.deref()),
-                parameters: HashMap::new(),
+                parameters: std::collections::HashMap::new(),
                 contents: None,
             })
             .collect();
@@ -203,6 +210,9 @@ impl GrpcInferenceService for TritonService {
         with_local_metrics(|m| {
             m.inc_requests_ok(&model_name);
             m.observe_request_duration(&model_name, start.elapsed().as_secs_f64());
+            if let Some(batch_size) = client_batch_size {
+                m.observe_client_batch_size(&model_name, batch_size as f64);
+            }
             trace.record_metrics(model_name.as_str(), m);
         });
 
@@ -210,7 +220,7 @@ impl GrpcInferenceService for TritonService {
             model_name: proxy.model_config.name.clone(),
             model_version: String::from("1"),
             id: request.id.clone(),
-            parameters: HashMap::with_capacity(0),
+            parameters: std::collections::HashMap::with_capacity(0),
             outputs,
             raw_output_contents: raw_output,
         })

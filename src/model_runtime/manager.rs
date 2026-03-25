@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -344,9 +344,9 @@ impl ModelRuntimeManager {
             optimization: None,
             instance_group: vec![],
             default_model_filename: String::from("todo"),
-            cc_model_filenames: HashMap::new(),
-            metric_tags: HashMap::new(),
-            parameters: HashMap::new(),
+            cc_model_filenames: std::collections::HashMap::new(),
+            metric_tags: std::collections::HashMap::new(),
+            parameters: std::collections::HashMap::new(),
             model_warmup: vec![],
             model_operations: None,
             model_transaction_policy: None,

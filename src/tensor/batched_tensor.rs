@@ -496,7 +496,7 @@ impl BatchableTensor {
     }
 }
 
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 use ort::{
     memory::Allocator,

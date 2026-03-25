@@ -5,3 +5,4 @@ perf.data
 .gitignore
 perf.data.old
 model_repository/
+custom_ops/build/
