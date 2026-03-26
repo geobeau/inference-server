@@ -37,6 +37,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = cli::Args::parse();
     let processing_cores = args.processing_cores;
     let executor_cores = args.executor_cores;
+    let pin_cpus: Option<Vec<core_affinity::CoreId>> = if args.cpu_pinning {
+        let cores = core_affinity::get_core_ids().expect("failed to read cpuset");
+        info!("CPU pinning enabled, available cores: {:?}", cores.iter().map(|c| c.id).collect::<Vec<_>>());
+        Some(cores)
+    } else {
+        None
+    };
+    let mut pin_index: usize = 0;
 
     // Validate CLI early so we fail fast before starting gRPC / workers
     let model_source = args.model_source();
@@ -136,7 +144,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = pajamax::Config::new()
         .max_concurrent_connections(args.max_concurrent_connections)
         .max_concurrent_streams(args.max_concurrent_streams)
-        .max_frame_size(args.max_frame_size);
+        .max_frame_size(args.max_frame_size)
+        .buffer_pool_size(1024);
 
     let grpc_loaded_models = loaded_models.clone();
     let services: Vec<Box<dyn Fn() -> std::rc::Rc<dyn pajamax::PajamaxService> + Send + Sync>> =
@@ -166,9 +175,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         manager_metrics.clone(),
         custom_op_libraries,
     );
+    let manager_pin_cpu = pin_cpus.as_ref().map(|cpus| {
+        let core = cpus[pin_index % cpus.len()];
+        pin_index += 1;
+        core
+    });
     let manager_handle = std::thread::Builder::new()
         .name("model-manager".into())
         .spawn(move || {
+            if let Some(core) = manager_pin_cpu {
+                core_affinity::set_for_current(core);
+                info!("Pinned model-manager to CPU {}", core.id);
+            }
             let rt = compio::runtime::RuntimeBuilder::new()
                 .build()
                 .expect("failed to build manager compio runtime");
@@ -192,10 +210,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for core_id in 0..executor_cores {
         let starter_rx = starter_rxs[core_id].take().unwrap();
         let metrics_for_executor = metrics_registry.clone();
+        let exec_pin_cpu = pin_cpus.as_ref().map(|cpus| {
+            let core = cpus[pin_index % cpus.len()];
+            pin_index += 1;
+            core
+        });
 
         let handle = std::thread::Builder::new()
             .name(format!("exec-{core_id}"))
             .spawn(move || {
+                if let Some(core) = exec_pin_cpu {
+                    core_affinity::set_for_current(core);
+                    info!("Pinned exec-{core_id} to CPU {}", core.id);
+                }
                 let rt = compio::runtime::RuntimeBuilder::new()
                     .build()
                     .expect("failed to build executor compio runtime");
@@ -224,10 +251,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             None
         };
+        let proc_pin_cpu = pin_cpus.as_ref().map(|cpus| {
+            let core = cpus[pin_index % cpus.len()];
+            pin_index += 1;
+            core
+        });
 
         let handle = std::thread::Builder::new()
             .name(format!("proc-{core_id}"))
             .spawn(move || {
+                if let Some(core) = proc_pin_cpu {
+                    core_affinity::set_for_current(core);
+                    info!("Pinned proc-{core_id} to CPU {}", core.id);
+                }
                 let mut proactor = compio::driver::ProactorBuilder::new();
                 proactor
                     .capacity(8096)

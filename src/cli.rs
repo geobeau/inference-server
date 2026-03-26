@@ -125,6 +125,10 @@ pub struct Args {
     /// Maximum HTTP/2 frame size in bytes (max 16777215).
     #[arg(long, default_value_t = 32 * 1024)]
     pub max_frame_size: usize,
+
+    /// Pin each compio runtime thread to a CPU from the process cpuset in round-robin order.
+    #[arg(long, default_value_t = false)]
+    pub cpu_pinning: bool,
 }
 
 pub enum ModelSource {
@@ -165,3 +169,5 @@ fn default_num_cores() -> usize {
         .map(|n| n.get())
         .unwrap_or(1)
 }
+
+
