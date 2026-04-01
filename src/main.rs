@@ -64,11 +64,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cache_dir,
         } => {
             let repo = ModelRepository::new(&endpoint, &bucket, &prefix, &region, cache_dir);
+            let filter: Option<std::collections::HashSet<String>> = args
+                .load_models
+                .as_ref()
+                .map(|v| v.iter().cloned().collect());
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .unwrap();
-            rt.block_on(repo.load_all())
+            rt.block_on(repo.load_all(filter.as_ref()))
                 .expect("failed to load models from S3")
         }
     };

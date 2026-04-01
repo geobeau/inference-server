@@ -55,7 +55,10 @@ impl ModelRepository {
         }
     }
 
-    pub async fn load_all(&self) -> Result<Vec<LoadedModel>, Box<dyn std::error::Error>> {
+    pub async fn load_all(
+        &self,
+        filter: Option<&HashSet<String>>,
+    ) -> Result<Vec<LoadedModel>, Box<dyn std::error::Error>> {
         let prefix_path = FusioPath::from(self.prefix.as_str());
         let entries = self.fs.list(&prefix_path).await?;
         futures::pin_mut!(entries);
@@ -69,7 +72,9 @@ impl ModelRepository {
                 let rest = rest.trim_start_matches('/');
                 if let Some(model_name) = rest.split('/').next() {
                     if !model_name.is_empty() {
-                        model_names.insert(model_name.to_string());
+                        if filter.map_or(true, |f| f.contains(model_name)) {
+                            model_names.insert(model_name.to_string());
+                        }
                     }
                 }
             }

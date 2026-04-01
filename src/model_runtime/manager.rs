@@ -7,13 +7,15 @@ use std::time::Duration;
 use arc_swap::ArcSwap;
 use ort::memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType};
 use ort::session::builder::GraphOptimizationLevel;
-use ort::session::Session;
+use ort::session::{RunOptions, Session};
+use smallvec::SmallVec;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
 use crate::grpc::inference::{
     model_metadata_response::TensorMetadata, DataType, ModelConfig, ModelInput, ModelOutput,
 };
+use crate::tensor::supertensor::SessionValues;
 use crate::metrics::MetricsRegistry;
 use crate::model_repository::config::{AllocatorKind, ModelRepositoryConfig};
 use crate::scheduler::{ModelInputMetadata, ModelMetadata, ModelProxy};
@@ -361,6 +363,30 @@ impl ModelRuntimeManager {
             model_config,
             model_metadata,
         });
+
+        // Warmup each session before making the model available
+        for (i, session) in sessions.iter_mut().enumerate() {
+            info!(%model_name, executor = i, "warming up session");
+            model_proxy
+                .data
+                .warmup(async |inputs| {
+                    let run_options = RunOptions::new().unwrap();
+                    let session_outputs = session
+                        .run_async(inputs, &run_options)
+                        .unwrap()
+                        .await
+                        .unwrap();
+                    let mut values: SmallVec<[ort::value::Value; 4]> =
+                        SmallVec::with_capacity(session_outputs.len());
+                    session_outputs.into_iter().for_each(|(_, value)| {
+                        values.push(value);
+                    });
+                    SessionValues { values }
+                })
+                .await;
+        }
+        info!(%model_name, "all sessions warmed up");
+
         let metrics_model_name = model_name.clone();
 
         // Register in the shared model map

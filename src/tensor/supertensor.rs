@@ -588,6 +588,27 @@ impl SuperTensorBuffer {
         batch_items
     }
 
+    pub async fn warmup<F>(&self, f: F)
+    where
+        F: AsyncFnOnce(&[SessionInputValue]) -> SessionValues,
+    {
+        let batch_start = self.head.value.fetch_add(self.batch_size, Ordering::AcqRel);
+        self.executor_head
+            .value
+            .fetch_add(self.batch_size, Ordering::AcqRel);
+
+        let idx = RingBufferIndex::new(batch_start, &self.head);
+        let tracker = &self.trackers[idx.as_batch_id()];
+        tracker.dirty.store(1, Ordering::Release);
+
+        let _guard = ExecutorsInUseGuard::new(&self.executors_in_use);
+        let input = self.get_data_view(&idx);
+        let _ = f(&input).await;
+
+        self.reset_batch(tracker);
+        self.move_tail_to_next_non_dirty_buffer();
+    }
+
     pub fn metrics_snapshot(&self) -> SuperTensorMetricsSnapshot {
         SuperTensorMetricsSnapshot {
             tail_index: self.tail.load(Ordering::Acquire).as_absolute_index(),
